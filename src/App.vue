@@ -33,11 +33,24 @@ import { onMounted, ref } from 'vue'
 import { BladeFire } from '../blade-fire/index.js'
 
 const currentTool = ref('')
+let activeToolCleanup = null
 
 const selectTool = (tool) => {
+  // If clicking the same tool, do nothing or toggle? 
+  // For now, let's assume re-selecting resets the tool.
+  
+  // Cleanup previous tool
+  if (activeToolCleanup) {
+    activeToolCleanup()
+    activeToolCleanup = null
+  }
+  
   currentTool.value = tool
   if (BladeFire[tool]) {
-    BladeFire[tool]()
+    const cleanup = BladeFire[tool]()
+    if (typeof cleanup === 'function') {
+      activeToolCleanup = cleanup
+    }
   }
 }
 

@@ -1,3 +1,12 @@
-export function image() {
-    console.log("Draw an image");
+import { setCursor } from "../common/index.js";
+
+export function image(svg) {
+    console.log("Image tool activated");
+    if (svg) {
+        setCursor(svg, "crosshair");
+    }
+    
+    return () => {
+        console.log("Image tool deactivated");
+    };
 }

@@ -7,6 +7,7 @@ import { polygon } from "./tools/polygon.js";
 import { text } from "./tools/text.js";
 import { image } from "./tools/image.js";
 import { select } from "./tools/select.js";
+import { enableDrag } from "./tools/drag.js";
 
 class BladeFire {
     version = "1.0.0";
@@ -28,18 +29,40 @@ class BladeFire {
                 enableZoom(svg);
             }
 
+            // Always enable drag with middle mouse button
+            enableDrag(svg);
+
+            // Assign svg to the class instance (this refers to the class itself in a static method)
+            this.svg = svg;
+
             return svg;
         }
     }
 
-    static line = line;
-    static circle = circle;
-    static rect = rect;
-    static triangle = triangle;
-    static polygon = polygon;
-    static text = text;
-    static image = image;
-    static select = select;
+    static line() {
+        return line(this.svg);
+    }
+    static circle() {
+        return circle(this.svg);
+    }
+    static rect() {
+        return rect(this.svg);
+    }
+    static triangle() {
+        return triangle(this.svg);
+    }
+    static polygon() {
+        return polygon(this.svg);
+    }
+    static text() {
+        return text(this.svg);
+    }
+    static image() {
+        return image(this.svg);
+    }
+    static select() {
+        return select(this.svg);
+    }
 }
 
 export { BladeFire };

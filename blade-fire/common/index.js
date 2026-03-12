@@ -1,4 +1,4 @@
-
+// 创建网格
 export function createGrid(svg, width, height, gridSize) {
   const svgNS = "http://www.w3.org/2000/svg";
   const defs = document.createElementNS(svgNS, "defs");
@@ -27,7 +27,7 @@ export function createGrid(svg, width, height, gridSize) {
 
   svg.appendChild(rect);
 }
-
+// 启用缩放功能
 export function enableZoom(svg) {
   let viewBox = { x: 0, y: 0, w: svg.clientWidth, h: svg.clientHeight };
   const zoomSensitivity = 0.002;
@@ -84,6 +84,10 @@ export function enableZoom(svg) {
   svg.addEventListener('wheel', (e) => {
     e.preventDefault();
 
+    // Always get the latest viewBox from the DOM to sync with other tools (like drag)
+    const currentVB = svg.getAttribute("viewBox").split(' ').map(Number);
+    viewBox = { x: currentVB[0], y: currentVB[1], w: currentVB[2], h: currentVB[3] };
+
     const rect = svg.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
@@ -109,4 +113,16 @@ export function enableZoom(svg) {
     svg.setAttribute('viewBox', `${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`);
     updateGridRect();
   });
+}
+// 自定义手势
+export function setCursor(svg, cursor) {
+  if (!svg) return;
+  
+  // 如果是自定义图片 URL
+  if (cursor.includes('.') || cursor.includes('data:image')) {
+    svg.style.cursor = `url(${cursor}), auto`;
+  } else {
+    // 原生光标样式 (如 'pointer', 'crosshair', 'move', 'default' 等)
+    svg.style.cursor = cursor;
+  }
 }
