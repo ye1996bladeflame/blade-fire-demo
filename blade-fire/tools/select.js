@@ -6,7 +6,9 @@ export function select(svg) {
     console.log("Select tool activated");
     setCursor(svg, "default");
 
-    
+    let isActive = true;
+
+    // Selection state
     let selectedElements = []; 
     let transformGroup = null; 
     let selectionRect = null; 
@@ -234,6 +236,8 @@ export function select(svg) {
 
     
     function updateTransformHandles() {
+        if (!isActive) return;
+
         if (transformGroup) {
             if (transformGroup.parentNode) transformGroup.parentNode.removeChild(transformGroup);
             transformGroup = null;
@@ -852,10 +856,6 @@ export function select(svg) {
                             
                             if (c.isVertex) {
                                 c.el.setAttribute("d", c.oldD);
-                                
-                                if (selectedElements.length === 1 && selectedElements[0] === c.el) {
-                                    createVertexHandles(c.el);
-                                }
                             } else if (c.isRect) {
                                 c.el.setAttribute("x", c.oldX);
                                 c.el.setAttribute("y", c.oldY);
@@ -863,7 +863,6 @@ export function select(svg) {
                                 c.el.setAttribute("height", c.oldH);
                             }
                         });
-                        updateTransformHandles();
                     },
                     redo: () => {
                         changes.forEach(c => {
@@ -872,9 +871,6 @@ export function select(svg) {
                             
                             if (c.isVertex) {
                                 c.el.setAttribute("d", c.newD);
-                                if (selectedElements.length === 1 && selectedElements[0] === c.el) {
-                                    createVertexHandles(c.el);
-                                }
                             } else if (c.isRect) {
                                 c.el.setAttribute("x", c.newX);
                                 c.el.setAttribute("y", c.newY);
@@ -882,7 +878,6 @@ export function select(svg) {
                                 c.el.setAttribute("height", c.newH);
                             }
                         });
-                        updateTransformHandles();
                     }
                 });
             }
@@ -938,6 +933,10 @@ export function select(svg) {
                         needsUpdate = true;
                     }
                 });
+            } else if (mutation.type === 'attributes') {
+                if (selectedElements.includes(mutation.target) && !isDragging) {
+                    needsUpdate = true;
+                }
             }
         });
         if (needsUpdate) {
@@ -945,7 +944,12 @@ export function select(svg) {
         }
     });
     
-    observer.observe(svg, { childList: true });
+    observer.observe(svg, { 
+        childList: true, 
+        subtree: true, 
+        attributes: true, 
+        attributeFilter: ['transform', 'd', 'x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'rx', 'ry'] 
+    });
 
     
     svg.addEventListener("mousedown", onMouseDown);
@@ -953,6 +957,7 @@ export function select(svg) {
     window.addEventListener("mouseup", onMouseUp);
 
     return () => {
+        isActive = false;
         console.log("Select tool deactivated");
         observer.disconnect();
         svg.removeEventListener("mousedown", onMouseDown);
