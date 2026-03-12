@@ -54,6 +54,33 @@ export function enableZoom(svg) {
   // Initial update
   updateGridRect();
 
+  // ResizeObserver to handle container resize
+  let prevWidth = svg.clientWidth;
+  let prevHeight = svg.clientHeight;
+  const resizeObserver = new ResizeObserver(entries => {
+    for (const entry of entries) {
+      const { width, height } = entry.contentRect;
+      if (width === 0 || height === 0) return;
+
+      if (prevWidth === 0 || prevHeight === 0) {
+          viewBox.w = width;
+          viewBox.h = height;
+      } else {
+          const scaleX = viewBox.w / prevWidth;
+          const scaleY = viewBox.h / prevHeight;
+          viewBox.w = width * scaleX;
+          viewBox.h = height * scaleY;
+      }
+      
+      svg.setAttribute('viewBox', `${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`);
+      updateGridRect();
+      
+      prevWidth = width;
+      prevHeight = height;
+    }
+  });
+  resizeObserver.observe(svg);
+
   svg.addEventListener('wheel', (e) => {
     e.preventDefault();
 
