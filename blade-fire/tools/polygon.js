@@ -13,7 +13,67 @@ export function polygon(svg) {
     let activePath = null;
     let guideLine = null;
     let startPointMarker = null; // Visual indicator for the start point
+    let snapIndicator = null; // Visual for snap point
     let overlayContainer = null;
+
+    // Find the nearest vertex to snap to
+    function findSnapPoint(mousePos, snapRadius = 10) {
+        const allPaths = Array.from(svg.querySelectorAll('path'));
+        let closestPoint = null;
+        let minDistance = Infinity;
+
+        const CTM = svg.getScreenCTM();
+        const mouseScreenX = mousePos.x * CTM.a + CTM.e;
+        const mouseScreenY = mousePos.y * CTM.d + CTM.f;
+
+        for (const path of allPaths) {
+            if (path === activePath) continue; // Don't snap to the active path
+            const d = path.getAttribute('d');
+            if (!d) continue;
+
+            // Simplified parser for "M x,y L x,y ..."
+            const commands = d.match(/[MmLlHhVv][^MmLlHhVv]*/g) || [];
+            let currentPos = { x: 0, y: 0 };
+            const points = [];
+            commands.forEach(cmdStr => {
+                const type = cmdStr[0];
+                const args = cmdStr.slice(1).trim().split(/[\s,]+/).map(parseFloat).filter(n => !isNaN(n));
+                if (type === 'M' || type === 'L') {
+                    for (let i = 0; i < args.length; i += 2) {
+                        currentPos = { x: args[i], y: args[i+1] };
+                        points.push(currentPos);
+                    }
+                } else if (type === 'm' || type === 'l') {
+                    for (let i = 0; i < args.length; i += 2) {
+                        currentPos.x += args[i];
+                        currentPos.y += args[i+1];
+                        points.push({...currentPos});
+                    }
+                }
+            });
+
+            const transform = path.getAttribute('transform');
+            const matrix = new DOMMatrix(transform || '');
+
+            for (const p of points) {
+                const transformedP = new DOMPoint(p.x, p.y).matrixTransform(matrix);
+                
+                // Convert to screen coordinates to calculate distance
+                const screenX = transformedP.x * CTM.a + CTM.e;
+                const screenY = transformedP.y * CTM.d + CTM.f;
+
+                const dx = screenX - mouseScreenX;
+                const dy = screenY - mouseScreenY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < snapRadius && distance < minDistance) {
+                    minDistance = distance;
+                    closestPoint = transformedP;
+                }
+            }
+        }
+        return closestPoint;
+    }
     
     // Helper: Get SVG coordinates
     function getMousePos(evt) {
@@ -87,21 +147,40 @@ export function polygon(svg) {
             startPointMarker.remove(); // HTML element
             startPointMarker = null;
         }
+        if (snapIndicator) {
+            snapIndicator.remove();
+            snapIndicator = null;
+        }
         points = [];
         activePath = null;
     }
 
     function onMouseDown(evt) {
         if (evt.button !== 0) return;
-        
-        const pos = getMousePos(evt);
 
-        // Check if we clicked the start point marker to close
-        // Since marker is HTML, we check target directly
-        if (startPointMarker && evt.target === startPointMarker) {
-            closePolygon();
-            evt.stopPropagation();
-            return;
+        let pos = getMousePos(evt);
+
+        // Check for closing action (priority 1)
+        if (points.length >= 2) {
+            const startPoint = points[0];
+            const snapRadius = 10;
+            const CTM = svg.getScreenCTM();
+            const mouseScreen = { x: pos.x * CTM.a + CTM.e, y: pos.y * CTM.d + CTM.f };
+            const startScreen = { x: startPoint.x * CTM.a + CTM.e, y: startPoint.y * CTM.d + CTM.f };
+            const dx = mouseScreen.x - startScreen.x;
+            const dy = mouseScreen.y - startScreen.y;
+            
+            if (Math.sqrt(dx * dx + dy * dy) < snapRadius || (startPointMarker && evt.target === startPointMarker)) {
+                closePolygon();
+                evt.stopPropagation();
+                return;
+            }
+        }
+
+        // If not closing, check for other snaps (priority 2)
+        const externalSnapPoint = findSnapPoint(pos);
+        if (externalSnapPoint) {
+            pos = externalSnapPoint;
         }
 
         points.push(pos);
@@ -109,8 +188,8 @@ export function polygon(svg) {
         if (points.length === 1) {
             // Start new polygon
             activePath = createSVGElement("path", {
-                "stroke": "black",
-                "stroke-width": "2",
+                "stroke": "green",
+                "stroke-width": "1",
                 "fill": "none",
                 "stroke-linejoin": "round",
                 "stroke-linecap": "round"
@@ -143,10 +222,6 @@ export function polygon(svg) {
             startPointMarker.style.pointerEvents = "auto"; // Enable click
             startPointMarker.style.boxSizing = "border-box";
             
-            // Position marker (need to convert SVG coords to percentage or pixel relative to foreignObject)
-            // Since foreignObject is 100% width/height and viewBox might differ, we need to map coords.
-            // But wait, foreignObject content is in HTML pixels (screen pixels relative to SVG container).
-            // We need to map SVG point to client point relative to SVG top-left.
             updateMarkerPosition(startPointMarker, pos);
             
             overlayContainer.appendChild(startPointMarker);
@@ -200,7 +275,24 @@ export function polygon(svg) {
     function onMouseMove(evt) {
         if (!points.length) return;
 
-        const pos = getMousePos(evt);
+        if (snapIndicator) snapIndicator.remove();
+
+        let pos = getMousePos(evt);
+        const snapPoint = findSnapPoint(pos);
+
+        if (snapPoint) {
+            pos = snapPoint;
+            snapIndicator = document.createElement("div");
+            snapIndicator.style.position = "absolute";
+            snapIndicator.style.width = "12px";
+            snapIndicator.style.height = "12px";
+            snapIndicator.style.border = "2px solid blue";
+            snapIndicator.style.borderRadius = "50%";
+            snapIndicator.style.pointerEvents = "none";
+            snapIndicator.style.boxSizing = "border-box";
+            updateMarkerPosition(snapIndicator, pos);
+            overlayContainer.appendChild(snapIndicator);
+        }
 
         // Update guide line
         if (guideLine) {

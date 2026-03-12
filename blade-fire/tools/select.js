@@ -143,6 +143,95 @@ export function select(svg) {
         return cursorMap[snapped] || 'default';
     }
 
+    // Helper: Parse path 'd' attribute into an array of points
+    function parsePathData(d) {
+        if (!d) return [];
+        const points = [];
+        // Simplified parser for "M x,y L x,y L x,y ..."
+        const commands = d.match(/[MmLlHhVv][^MmLlHhVv]*/g) || [];
+        let currentPos = { x: 0, y: 0 };
+        commands.forEach(cmdStr => {
+            const type = cmdStr[0];
+            const args = cmdStr.slice(1).trim().split(/[\s,]+/).map(parseFloat).filter(n => !isNaN(n));
+            
+            if (type === 'M' || type === 'L') {
+                for (let i = 0; i < args.length; i += 2) {
+                    currentPos = { x: args[i], y: args[i+1] };
+                    points.push(currentPos);
+                }
+            } else if (type === 'm' || type === 'l') {
+                 for (let i = 0; i < args.length; i += 2) {
+                    currentPos.x += args[i];
+                    currentPos.y += args[i+1];
+                    points.push({...currentPos});
+                }
+            }
+        });
+        
+        const finalPoints = [];
+        const uniquePoints = new Set();
+        for(const p of points) {
+            const key = `${p.x},${p.y}`;
+            if (!uniquePoints.has(key)) {
+                uniquePoints.add(key);
+                finalPoints.push(p);
+            }
+        }
+        
+        if (finalPoints.length > 2) {
+             const first = finalPoints[0];
+             const last = finalPoints[finalPoints.length - 1];
+             if (first.x === last.x && first.y === last.y) {
+                 finalPoints.pop();
+             }
+        }
+
+        return finalPoints;
+    }
+
+    // Helper: Build path 'd' attribute from an array of points
+    function buildPathData(points) {
+        if (!points || points.length === 0) return "";
+        const d = points.map((p, i) => {
+            return (i === 0 ? 'M' : 'L') + ` ${p.x} ${p.y}`;
+        }).join(' ');
+        return d + ' Z'; // Close the path
+    }
+
+    // Create vertex handles for polygon editing
+    function createVertexHandles(polygon) {
+        if (transformGroup) {
+            if (transformGroup.parentNode) transformGroup.parentNode.removeChild(transformGroup);
+            transformGroup = null;
+        }
+        
+        transformGroup = document.createElementNS(SVG_NS, "g");
+        const transform = polygon.getAttribute("transform");
+        if (transform) {
+            transformGroup.setAttribute("transform", transform);
+        }
+
+        const d = polygon.getAttribute('d');
+        const points = parsePathData(d);
+        
+        const handleSize = 8;
+        points.forEach((p, index) => {
+            const handle = document.createElementNS(SVG_NS, "circle");
+            handle.setAttribute("cx", p.x);
+            handle.setAttribute("cy", p.y);
+            handle.setAttribute("r", handleSize / 2);
+            handle.setAttribute("fill", "white");
+            handle.setAttribute("stroke", "#1890ff");
+            handle.setAttribute("stroke-width", 1);
+            handle.style.cursor = "move";
+            handle.dataset.type = "vertex";
+            handle.dataset.index = index;
+            transformGroup.appendChild(handle);
+        });
+
+        svg.appendChild(transformGroup);
+    }
+
     // Create/Update transform handles
     function updateTransformHandles() {
         if (transformGroup) {
@@ -151,6 +240,12 @@ export function select(svg) {
         }
 
         if (selectedElements.length === 0) return;
+
+        // If a single polygon is selected, show vertex handles
+        if (selectedElements.length === 1 && selectedElements[0].tagName === 'path' && selectedElements[0].getAttribute('d').includes('Z')) {
+            createVertexHandles(selectedElements[0]);
+            return;
+        }
 
         transformGroup = document.createElementNS(SVG_NS, "g");
         
@@ -264,6 +359,16 @@ export function select(svg) {
             const el = selectedElements[0];
             const transform = el.getAttribute("transform") || "";
             const tData = parseTransform(transform);
+
+            if (dragMode === 'vertex') {
+                elementStates = [{
+                    el,
+                    initPoints: parsePathData(el.getAttribute('d')),
+                    initTransform: transform,
+                    tData: tData
+                }];
+                return;
+            }
             
             // For path/polygon, width/height/x/y might not exist as attributes
             let initW = 0, initH = 0, initX = 0, initY = 0;
@@ -340,8 +445,13 @@ export function select(svg) {
 
         // 1. Check Handle Click
         if (target.parentNode === transformGroup && target.dataset.type) {
-            dragMode = target.dataset.type === 'rotate' ? 'rotate' : 'resize';
-            resizeHandle = target.dataset.type;
+            if (target.dataset.type === 'vertex') {
+                dragMode = 'vertex';
+                resizeHandle = target.dataset.index; // Store vertex index
+            } else {
+                dragMode = target.dataset.type === 'rotate' ? 'rotate' : 'resize';
+                resizeHandle = target.dataset.type;
+            }
             setCursor(svg, target.style.cursor);
             captureState(pos);
             evt.stopPropagation();
@@ -403,6 +513,40 @@ export function select(svg) {
             selectionRect.setAttribute("y", y);
             selectionRect.setAttribute("width", w);
             selectionRect.setAttribute("height", h);
+        } else if (dragMode === 'vertex') {
+            const s = elementStates[0];
+            const index = parseInt(resizeHandle, 10);
+            
+            // Apply inverse transform to mouse delta to get delta in element's local space
+            let ldx = dx;
+            let ldy = dy;
+            const t = s.tData;
+            if (t.rotate) {
+                const rad = -t.rotate * Math.PI / 180;
+                ldx = dx * Math.cos(rad) - dy * Math.sin(rad);
+                ldy = dx * Math.sin(rad) + dy * Math.cos(rad);
+            }
+            
+            // The delta must also be scaled if the element is scaled
+            ldx /= t.sx;
+            ldy /= t.sy;
+
+            const newPoints = s.initPoints.map((p, i) => {
+                if (i === index) {
+                    return { x: p.x + ldx, y: p.y + ldy };
+                }
+                return p;
+            });
+
+            const newD = buildPathData(newPoints);
+            s.el.setAttribute('d', newD);
+            
+            // Update the specific handle being dragged
+            const handle = transformGroup.querySelector(`[data-index="${index}"]`);
+            if (handle) {
+                handle.setAttribute('cx', newPoints[index].x);
+                handle.setAttribute('cy', newPoints[index].y);
+            }
         }
         else if (dragMode === 'move') {
             setCursor(svg, "move");

@@ -32,7 +32,7 @@ function onMouseDown(evt) {
     currentCircle.setAttribute("ry", 0);
     currentCircle.setAttribute("fill", "rgba(255, 99, 71, 0.3)"); // Tomato with opacity
     currentCircle.setAttribute("stroke", "#FF6347");
-    currentCircle.setAttribute("stroke-width", "2");
+    currentCircle.setAttribute("stroke-width", "1");
     
     svgElement.appendChild(currentCircle);
 }

@@ -32,7 +32,7 @@ function onMouseDown(evt) {
     currentRect.setAttribute("height", 0);
     currentRect.setAttribute("fill", "rgba(100, 149, 237, 0.3)"); // CornflowerBlue with opacity
     currentRect.setAttribute("stroke", "#6495ED");
-    currentRect.setAttribute("stroke-width", "2");
+    currentRect.setAttribute("stroke-width", "1");
     
     svgElement.appendChild(currentRect);
 }
