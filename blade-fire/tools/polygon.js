@@ -11,10 +11,12 @@ export function polygon(svg) {
     // State
     let points = [];
     let activePath = null;
+    let toolGroup = null;
     let guideLine = null;
     let startPointMarker = null; // Visual indicator for the start point
     let snapIndicator = null; // Visual for snap point
-    let overlayContainer = null;
+    let viewChangeObserver = null;
+    let lastMouseMoveEvent = null;
 
     // Find the nearest vertex to snap to
     function findSnapPoint(mousePos, snapRadius = 10) {
@@ -139,20 +141,21 @@ export function polygon(svg) {
         if (removePath && activePath) {
             svg.removeChild(activePath);
         }
-        if (guideLine) {
-            guideLine.remove(); // HTML element
-            guideLine = null;
+        if (toolGroup) {
+            toolGroup.remove();
+            toolGroup = null;
         }
-        if (startPointMarker) {
-            startPointMarker.remove(); // HTML element
-            startPointMarker = null;
-        }
-        if (snapIndicator) {
-            snapIndicator.remove();
-            snapIndicator = null;
+        guideLine = null;
+        startPointMarker = null;
+        snapIndicator = null;
+
+        if (viewChangeObserver) {
+            viewChangeObserver.disconnect();
+            viewChangeObserver = null;
         }
         points = [];
         activePath = null;
+        lastMouseMoveEvent = null;
     }
 
     function onMouseDown(evt) {
@@ -196,109 +199,103 @@ export function polygon(svg) {
             });
             svg.appendChild(activePath);
 
-            // Get overlay container
-            overlayContainer = getOverlayLayer(svg);
+            // Create tool group
+            toolGroup = createSVGElement("g", {
+                "pointer-events": "none"
+            });
+            svg.appendChild(toolGroup);
 
-            // Create guide line (HTML Div)
-            guideLine = document.createElement("div");
-            guideLine.style.position = "absolute";
-            guideLine.style.height = "1px"; // Thin line
-            guideLine.style.backgroundColor = "red";
-            guideLine.style.borderTop = "1px dashed red"; // Dashed style
-            guideLine.style.backgroundColor = "transparent";
-            guideLine.style.transformOrigin = "0 0";
-            guideLine.style.pointerEvents = "none";
-            overlayContainer.appendChild(guideLine);
+            // Create guide line (SVG Line)
+            guideLine = createSVGElement("line", {
+                stroke: "red",
+                "stroke-dasharray": "5,5",
+                "pointer-events": "none"
+            });
+            toolGroup.appendChild(guideLine);
 
-            // Create start point marker (HTML Div)
-            startPointMarker = document.createElement("div");
-            startPointMarker.style.position = "absolute";
-            startPointMarker.style.width = "10px";
-            startPointMarker.style.height = "10px";
-            startPointMarker.style.backgroundColor = "white";
-            startPointMarker.style.border = "2px solid red";
-            startPointMarker.style.borderRadius = "50%";
-            startPointMarker.style.cursor = "pointer";
-            startPointMarker.style.pointerEvents = "auto"; // Enable click
-            startPointMarker.style.boxSizing = "border-box";
-            
-            updateMarkerPosition(startPointMarker, pos);
-            
-            overlayContainer.appendChild(startPointMarker);
+            // Create start point marker (SVG Circle)
+            startPointMarker = createSVGElement("circle", {
+                fill: "white",
+                stroke: "red",
+                cursor: "pointer",
+                "pointer-events": "auto" // Enable click
+            });
+            updateMarkerAttr(startPointMarker, pos);
+            toolGroup.appendChild(startPointMarker);
+
+            // Add viewBox observer
+            handleViewBoxChange(); // Initial call
+            viewChangeObserver = new MutationObserver(handleViewBoxChange);
+            viewChangeObserver.observe(svg, { attributes: true, attributeFilter: ['viewBox'] });
         }
 
         updatePath();
     }
 
-    // Helper to map SVG coord to HTML style
-    function updateMarkerPosition(el, svgPos) {
-        // We need to convert SVG local coordinate (svgPos) to pixel coordinate relative to the SVG element
-        // Since foreignObject is 100% size of SVG, its coordinate system is the same as the SVG's client rect (0,0 at top-left)
-        // We can use CTM to convert back.
+    // Helper to map SVG coord to SVG attributes (handling scale)
+    function updateMarkerAttr(el, svgPos) {
         const CTM = svg.getScreenCTM();
-        // screenX = svgX * a + e
-        // screenY = svgY * d + f
-        // But we need position relative to the SVG container (foreignObject), not screen.
-        // So we subtract SVG's bounding client rect.
-        const svgRect = svg.getBoundingClientRect();
-        
-        const screenX = svgPos.x * CTM.a + CTM.e;
-        const screenY = svgPos.y * CTM.d + CTM.f;
-        
-        const localX = screenX - svgRect.left;
-        const localY = screenY - svgRect.top;
-        
-        el.style.left = (localX - 5) + "px"; // -5 for centering (radius)
-        el.style.top = (localY - 5) + "px";
+        const scale = 1 / CTM.a;
+        el.setAttribute("cx", svgPos.x);
+        el.setAttribute("cy", svgPos.y);
+        el.setAttribute("r", 5 * scale);
+        el.setAttribute("stroke-width", 2 * scale);
     }
 
-    function updateGuideLine(el, p1, p2) {
-        const CTM = svg.getScreenCTM();
-        const svgRect = svg.getBoundingClientRect();
-        
-        const sX1 = p1.x * CTM.a + CTM.e - svgRect.left;
-        const sY1 = p1.y * CTM.d + CTM.f - svgRect.top;
-        const sX2 = p2.x * CTM.a + CTM.e - svgRect.left;
-        const sY2 = p2.y * CTM.d + CTM.f - svgRect.top;
-        
-        const dx = sX2 - sX1;
-        const dy = sY2 - sY1;
-        const length = Math.sqrt(dx * dx + dy * dy);
-        const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-        
-        el.style.width = length + "px";
-        el.style.left = sX1 + "px";
-        el.style.top = sY1 + "px";
-        el.style.transform = `rotate(${angle}deg)`;
+    function handleViewBoxChange() {
+        if (lastMouseMoveEvent) {
+            handleMouseMove(lastMouseMoveEvent);
+        } else if (points.length > 0) {
+             // Force update if we have points but no mouse move yet (e.g. initial zoom)
+             if (startPointMarker) updateMarkerAttr(startPointMarker, points[0]);
+        }
     }
 
-    function onMouseMove(evt) {
+    function updateGuideLineAttr(el, p1, p2) {
+        const CTM = svg.getScreenCTM();
+        const scale = 1 / CTM.a;
+        el.setAttribute("x1", p1.x);
+        el.setAttribute("y1", p1.y);
+        el.setAttribute("x2", p2.x);
+        el.setAttribute("y2", p2.y);
+        el.setAttribute("stroke-width", 1 * scale);
+    }
+
+    function handleMouseMove(evt) {
+        lastMouseMoveEvent = evt; // Store last event
         if (!points.length) return;
 
-        if (snapIndicator) snapIndicator.remove();
+        if (snapIndicator) {
+            snapIndicator.remove();
+            snapIndicator = null;
+        }
 
         let pos = getMousePos(evt);
         const snapPoint = findSnapPoint(pos);
 
         if (snapPoint) {
             pos = snapPoint;
-            snapIndicator = document.createElement("div");
-            snapIndicator.style.position = "absolute";
-            snapIndicator.style.width = "12px";
-            snapIndicator.style.height = "12px";
-            snapIndicator.style.border = "2px solid blue";
-            snapIndicator.style.borderRadius = "50%";
-            snapIndicator.style.pointerEvents = "none";
-            snapIndicator.style.boxSizing = "border-box";
-            updateMarkerPosition(snapIndicator, pos);
-            overlayContainer.appendChild(snapIndicator);
+            snapIndicator = createSVGElement("circle", {
+                fill: "none",
+                stroke: "blue",
+                "pointer-events": "none"
+            });
+            if (toolGroup) toolGroup.appendChild(snapIndicator);
+            updateMarkerAttr(snapIndicator, pos);
         }
 
-        // Update guide line
+        // Update guide line and start marker
         if (guideLine) {
             const lastPoint = points[points.length - 1];
-            updateGuideLine(guideLine, lastPoint, pos);
+            updateGuideLineAttr(guideLine, lastPoint, pos);
         }
+        if (startPointMarker) {
+            updateMarkerAttr(startPointMarker, points[0]);
+        }
+    }
+
+    function onMouseMove(evt) {
+        handleMouseMove(evt);
     }
 
     function onContextMenu(evt) {
