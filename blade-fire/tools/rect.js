@@ -16,7 +16,7 @@ function getMousePosition(evt) {
 }
 
 function onMouseDown(evt) {
-    // Only allow left mouse button (button 0)
+    
     if (evt.button !== 0) return;
 
     isDrawing = true;
@@ -30,7 +30,7 @@ function onMouseDown(evt) {
     currentRect.setAttribute("y", startY);
     currentRect.setAttribute("width", 0);
     currentRect.setAttribute("height", 0);
-    currentRect.setAttribute("fill", "rgba(100, 149, 237, 0.3)"); // CornflowerBlue with opacity
+    currentRect.setAttribute("fill", "rgba(100, 149, 237, 0.3)"); 
     currentRect.setAttribute("stroke", "#6495ED");
     currentRect.setAttribute("stroke-width", "1");
     
@@ -44,11 +44,11 @@ function onMouseMove(evt) {
     const currentX = pos.x;
     const currentY = pos.y;
 
-    // Calculate width and height
+    
     const width = Math.abs(currentX - startX);
     const height = Math.abs(currentY - startY);
 
-    // Calculate new x and y (handle drawing in any direction)
+    
     const newX = currentX < startX ? currentX : startX;
     const newY = currentY < startY ? currentY : startY;
 
@@ -82,27 +82,27 @@ function onMouseUp(evt) {
 export function rect(svg) {
     console.log("Activate rect tool");
     
-    // Set SVG element from parameter
+    
     svgElement = svg;
     if (!svgElement) {
         console.error("BladeFire SVG not initialized");
         return;
     }
 
-    // Set cursor
+    
     setCursor(svgElement, "crosshair");
 
-    // Remove existing event listeners to avoid duplication
+    
     svgElement.removeEventListener("mousedown", onMouseDown);
     svgElement.removeEventListener("mousemove", onMouseMove);
     svgElement.removeEventListener("mouseup", onMouseUp);
 
-    // Add new listeners
+    
     svgElement.addEventListener("mousedown", onMouseDown);
     svgElement.addEventListener("mousemove", onMouseMove);
     svgElement.addEventListener("mouseup", onMouseUp);
 
-    // Return cleanup function
+    
     return () => {
         svgElement.removeEventListener("mousedown", onMouseDown);
         svgElement.removeEventListener("mousemove", onMouseMove);

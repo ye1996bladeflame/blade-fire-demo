@@ -17,7 +17,7 @@ export function enableDrag(svg) {
     }
 
     function onMouseDown(evt) {
-        // Only middle mouse button (button 1)
+        
         if (evt.button !== 1) return;
 
         evt.preventDefault();
@@ -25,11 +25,11 @@ export function enableDrag(svg) {
         startX = evt.clientX;
         startY = evt.clientY;
 
-        // Store original cursor and set grabbing cursor
+        
         originalCursor = svg.style.cursor;
         setCursor(svg, "grabbing");
 
-        // Get current viewBox
+        
         const vb = svg.getAttribute("viewBox").split(' ').map(Number);
         viewBox = { x: vb[0], y: vb[1], w: vb[2], h: vb[3] };
     }
@@ -39,12 +39,12 @@ export function enableDrag(svg) {
 
         evt.preventDefault();
 
-        // Calculate delta
+        
         const dx = evt.clientX - startX;
         const dy = evt.clientY - startY;
 
-        // Update viewBox based on delta and current scale
-        // We need to account for the current zoom level (scale)
+        
+        
         const rect = svg.getBoundingClientRect();
         const scaleX = viewBox.w / rect.width;
         const scaleY = viewBox.h / rect.height;
@@ -55,7 +55,7 @@ export function enableDrag(svg) {
         svg.setAttribute('viewBox', `${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`);
         updateGridRect();
 
-        // Update start positions for next move event
+        
         startX = evt.clientX;
         startY = evt.clientY;
     }
@@ -63,17 +63,17 @@ export function enableDrag(svg) {
     function onMouseUp(evt) {
         if (isDragging && evt.button === 1) {
             isDragging = false;
-            // Restore original cursor
+            
             setCursor(svg, originalCursor);
         }
     }
 
-    // Add event listeners
+    
     svg.addEventListener("mousedown", onMouseDown);
-    window.addEventListener("mousemove", onMouseMove); // Use window to handle drag outside svg
+    window.addEventListener("mousemove", onMouseMove); 
     window.addEventListener("mouseup", onMouseUp);
 
-    // Return cleanup function (though this is a global feature, usually not cleaned up unless destroyed)
+    
     return () => {
         svg.removeEventListener("mousedown", onMouseDown);
         window.removeEventListener("mousemove", onMouseMove);

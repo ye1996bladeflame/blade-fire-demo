@@ -6,35 +6,35 @@ export function select(svg) {
     console.log("Select tool activated");
     setCursor(svg, "default");
 
-    // State
-    let selectedElements = []; // Array of selected elements
-    let transformGroup = null; // The visual handles group
-    let selectionRect = null; // The rubber band rect
     
-    // Drag State
+    let selectedElements = []; 
+    let transformGroup = null; 
+    let selectionRect = null; 
+    
+    
     let isDragging = false;
-    let dragMode = null; // 'select', 'move', 'resize', 'rotate'
-    let startPos = { x: 0, y: 0 }; // Mouse down position
-    let initialMouse = { x: 0, y: 0 }; // Mouse position at start of drag
+    let dragMode = null; 
+    let startPos = { x: 0, y: 0 }; 
+    let initialMouse = { x: 0, y: 0 }; 
     
-    // Captured state for transformation
-    let elementStates = []; // Store initial state of elements
-    let groupBounds = null; // {x, y, w, h, cx, cy} for multi-selection group
-    let resizeHandle = null; // 'nw', 'ne', etc.
     
-    // Helper: Parse transform string to object
+    let elementStates = []; 
+    let groupBounds = null; 
+    let resizeHandle = null; 
+    
+    
     function parseTransform(transformStr) {
         const result = { tx: 0, ty: 0, rotate: 0, cx: 0, cy: 0, sx: 1, sy: 1 };
         if (!transformStr) return result;
         
-        // Match translate (first one)
+        
         const tMatch = transformStr.match(/translate\s*\(\s*([-\d.e]+)\s*[,\s]\s*([-\d.e]+)\s*\)/);
         if (tMatch) {
             result.tx = parseFloat(tMatch[1]);
             result.ty = parseFloat(tMatch[2]);
         }
         
-        // Match rotate
+        
         const rMatch = transformStr.match(/rotate\s*\(\s*([-\d.e]+)(?:\s*[,\s]\s*([-\d.e]+)\s*[,\s]\s*([-\d.e]+))?\s*\)/);
         if (rMatch) {
             result.rotate = parseFloat(rMatch[1]);
@@ -42,7 +42,7 @@ export function select(svg) {
             if (rMatch[3] !== undefined) result.cy = parseFloat(rMatch[3]);
         }
         
-        // Match scale
+        
         const sMatch = transformStr.match(/scale\s*\(\s*([-\d.e]+)(?:\s*[,\s]\s*([-\d.e]+))?\s*\)/);
         if (sMatch) {
             result.sx = parseFloat(sMatch[1]);
@@ -52,7 +52,7 @@ export function select(svg) {
         return result;
     }
 
-    // Helper: Rotate a point around a center
+    
     function rotatePoint(x, y, cx, cy, angle) {
         const rad = angle * Math.PI / 180;
         const cos = Math.cos(rad);
@@ -65,7 +65,7 @@ export function select(svg) {
         };
     }
 
-    // Helper: Get mouse position in SVG coordinates
+    
     function getMousePosition(evt) {
         const CTM = svg.getScreenCTM();
         if (!CTM) return { x: 0, y: 0 };
@@ -75,7 +75,7 @@ export function select(svg) {
         };
     }
 
-    // Helper: Create the selection box (rubber band)
+    
     function createSelectionRect(x, y) {
         const rect = document.createElementNS(SVG_NS, "rect");
         rect.setAttribute("x", x);
@@ -114,11 +114,11 @@ export function select(svg) {
         }
     }
 
-    // Helper: Calculate visual cursor based on handle position and rotation
+    
     function getCursorForHandle(handleType, rotation) {
         if (!handleType || handleType === 'rotate') return 'grab';
         
-        // Map handle type to angle
+        
         const angleMap = {
             'n': 0, 'ne': 45, 'e': 90, 'se': 135,
             's': 180, 'sw': 225, 'w': 270, 'nw': 315
@@ -127,14 +127,14 @@ export function select(svg) {
         let angle = angleMap[handleType];
         if (angle === undefined) return 'default';
         
-        // Add object rotation
+        
         angle = (angle + rotation) % 360;
         if (angle < 0) angle += 360;
         
-        // Snap to nearest 45 degree
+        
         const snapped = Math.round(angle / 45) * 45 % 360;
         
-        // Map back to cursor name
+        
         const cursorMap = {
             0: 'n-resize', 45: 'ne-resize', 90: 'e-resize', 135: 'se-resize',
             180: 's-resize', 225: 'sw-resize', 270: 'w-resize', 315: 'nw-resize'
@@ -143,11 +143,11 @@ export function select(svg) {
         return cursorMap[snapped] || 'default';
     }
 
-    // Helper: Parse path 'd' attribute into an array of points
+    
     function parsePathData(d) {
         if (!d) return [];
         const points = [];
-        // Simplified parser for "M x,y L x,y L x,y ..."
+        
         const commands = d.match(/[MmLlHhVv][^MmLlHhVv]*/g) || [];
         let currentPos = { x: 0, y: 0 };
         commands.forEach(cmdStr => {
@@ -189,16 +189,16 @@ export function select(svg) {
         return finalPoints;
     }
 
-    // Helper: Build path 'd' attribute from an array of points
+    
     function buildPathData(points) {
         if (!points || points.length === 0) return "";
         const d = points.map((p, i) => {
             return (i === 0 ? 'M' : 'L') + ` ${p.x} ${p.y}`;
         }).join(' ');
-        return d + ' Z'; // Close the path
+        return d + ' Z'; 
     }
 
-    // Create vertex handles for polygon editing
+    
     function createVertexHandles(polygon) {
         if (transformGroup) {
             if (transformGroup.parentNode) transformGroup.parentNode.removeChild(transformGroup);
@@ -232,7 +232,7 @@ export function select(svg) {
         svg.appendChild(transformGroup);
     }
 
-    // Create/Update transform handles
+    
     function updateTransformHandles() {
         if (transformGroup) {
             if (transformGroup.parentNode) transformGroup.parentNode.removeChild(transformGroup);
@@ -241,7 +241,7 @@ export function select(svg) {
 
         if (selectedElements.length === 0) return;
 
-        // If a single polygon is selected, show vertex handles
+        
         if (selectedElements.length === 1 && selectedElements[0].tagName === 'path' && selectedElements[0].getAttribute('d').includes('Z')) {
             createVertexHandles(selectedElements[0]);
             return;
@@ -253,7 +253,7 @@ export function select(svg) {
         let rotation = 0;
         
         if (selectedElements.length === 1) {
-            // Single selection: Use local BBox and apply element's transform to handles
+            
             const el = selectedElements[0];
             try {
                 bbox = el.getBBox();
@@ -267,7 +267,7 @@ export function select(svg) {
                 bbox = { x: 0, y: 0, width: 0, height: 0 };
             }
         } else {
-            // Multi selection: Use Global Union AABB
+            
             let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
             selectedElements.forEach(el => {
                 const b = getElementGlobalBounds(el);
@@ -279,7 +279,7 @@ export function select(svg) {
             bbox = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
         }
 
-        // Frame
+        
         const frame = document.createElementNS(SVG_NS, "rect");
         frame.setAttribute("x", bbox.x);
         frame.setAttribute("y", bbox.y);
@@ -291,14 +291,14 @@ export function select(svg) {
         frame.setAttribute("class", "selection-frame");
         transformGroup.appendChild(frame);
 
-        // Resize Handles
+        
         const handleSize = 8;
         const positions = [
             { x: bbox.x, y: bbox.y, type: "nw" },
             { x: bbox.x + bbox.width, y: bbox.y, type: "ne" },
             { x: bbox.x + bbox.width, y: bbox.y + bbox.height, type: "se" },
             { x: bbox.x, y: bbox.y + bbox.height, type: "sw" },
-            // Middle handles
+            
             { x: bbox.x + bbox.width / 2, y: bbox.y, type: "n" },
             { x: bbox.x + bbox.width, y: bbox.y + bbox.height / 2, type: "e" },
             { x: bbox.x + bbox.width / 2, y: bbox.y + bbox.height, type: "s" },
@@ -315,14 +315,14 @@ export function select(svg) {
             handle.setAttribute("stroke", "#1890ff");
             handle.setAttribute("stroke-width", 1);
             
-            // Calculate correct cursor based on rotation
+            
             const cursor = getCursorForHandle(pos.type, rotation);
             handle.style.cursor = cursor;
             handle.dataset.type = pos.type;
             transformGroup.appendChild(handle);
         });
 
-        // Rotate Handle
+        
         const rotHandle = document.createElementNS(SVG_NS, "circle");
         const rotX = bbox.x + bbox.width / 2;
         const rotY = bbox.y - 20;
@@ -335,7 +335,7 @@ export function select(svg) {
         rotHandle.dataset.type = "rotate";
         transformGroup.appendChild(rotHandle);
 
-        // Line connecting rotation handle
+        
         const line = document.createElementNS(SVG_NS, "line");
         line.setAttribute("x1", rotX);
         line.setAttribute("y1", rotY + 5);
@@ -370,7 +370,7 @@ export function select(svg) {
                 return;
             }
             
-            // For path/polygon, width/height/x/y might not exist as attributes
+            
             let initW = 0, initH = 0, initX = 0, initY = 0;
             const bbox = el.getBBox();
             
@@ -380,8 +380,8 @@ export function select(svg) {
                 initX = parseFloat(el.getAttribute("x"));
                 initY = parseFloat(el.getAttribute("y"));
             } else {
-                // For path, etc., calculate Visual Width/Height based on current scale
-                // tData.sx/sy are parsed from the transform string.
+                
+                
                 initW = bbox.width * tData.sx;
                 initH = bbox.height * tData.sy;
                 initX = bbox.x;
@@ -406,7 +406,7 @@ export function select(svg) {
                 tagName: el.tagName
             }];
         } else {
-            // Multi-selection state
+            
             let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
             elementStates = selectedElements.map(el => {
                 const b = getElementGlobalBounds(el);
@@ -438,16 +438,16 @@ export function select(svg) {
         isDragging = true;
         const target = evt.target;
 
-        // Ignore clicks on or inside a foreignObject
+        
         if (target.closest('foreignObject')) {
             return;
         }
 
-        // 1. Check Handle Click
+        
         if (target.parentNode === transformGroup && target.dataset.type) {
             if (target.dataset.type === 'vertex') {
                 dragMode = 'vertex';
-                resizeHandle = target.dataset.index; // Store vertex index
+                resizeHandle = target.dataset.index; 
             } else {
                 dragMode = target.dataset.type === 'rotate' ? 'rotate' : 'resize';
                 resizeHandle = target.dataset.type;
@@ -458,13 +458,13 @@ export function select(svg) {
             return;
         }
 
-        // 2. Check Element Click (Selected or Frame)
+        
         const isSelected = selectedElements.includes(target);
         const isFrame = target.parentNode === transformGroup && target.classList.contains('selection-frame');
 
         if (isSelected || isFrame) {
             if ((evt.shiftKey || evt.ctrlKey) && isSelected) {
-                // Deselect logic
+                
                 selectedElements = selectedElements.filter(el => el !== target);
                 updateTransformHandles();
                 isDragging = false;
@@ -476,12 +476,12 @@ export function select(svg) {
             return;
         }
 
-        // 3. New Selection
+        
         if (!evt.shiftKey && !evt.ctrlKey) {
             clearSelection();
         }
         
-        // Check if clicked on a new selectable element
+        
         if (target !== svg && target.tagName !== 'defs' && target.getAttribute('data-is-grid') !== 'true' && !target.classList.contains('grid-rect')) {
              if (!selectedElements.includes(target)) {
                  selectedElements.push(target);
@@ -493,7 +493,7 @@ export function select(svg) {
              }
         }
 
-        // 4. Start Rubber Band
+        
         dragMode = 'select';
         selectionRect = createSelectionRect(pos.x, pos.y);
     }
@@ -517,7 +517,7 @@ export function select(svg) {
             const s = elementStates[0];
             const index = parseInt(resizeHandle, 10);
             
-            // Apply inverse transform to mouse delta to get delta in element's local space
+            
             let ldx = dx;
             let ldy = dy;
             const t = s.tData;
@@ -527,7 +527,7 @@ export function select(svg) {
                 ldy = dx * Math.sin(rad) + dy * Math.cos(rad);
             }
             
-            // The delta must also be scaled if the element is scaled
+            
             ldx /= t.sx;
             ldy /= t.sy;
 
@@ -541,7 +541,7 @@ export function select(svg) {
             const newD = buildPathData(newPoints);
             s.el.setAttribute('d', newD);
             
-            // Update the specific handle being dragged
+            
             const handle = transformGroup.querySelector(`[data-index="${index}"]`);
             if (handle) {
                 handle.setAttribute('cx', newPoints[index].x);
@@ -555,13 +555,13 @@ export function select(svg) {
                 const newTx = s.initTx + dx;
                 const newTy = s.initTy + dy;
                 
-                // Construct new transform
-                // We use standard order: translate -> rotate -> scale
+                
+                
                 let tStr = `translate(${newTx}, ${newTy})`;
                 if (s.initRot) {
                     tStr += ` rotate(${s.initRot}, ${s.initCx || 0}, ${s.initCy || 0})`;
                 }
-                // Maintain scale if it existed
+                
                 if (s.initSx !== 1 || s.initSy !== 1) {
                     tStr += ` scale(${s.initSx}, ${s.initSy})`;
                 }
@@ -569,7 +569,7 @@ export function select(svg) {
                 s.el.setAttribute("transform", tStr);
                 transformGroup.setAttribute("transform", tStr);
             } else {
-                // Multi-move
+                
                 selectedElements.forEach((el, i) => {
                     const s = elementStates[i];
                     el.setAttribute("transform", `translate(${dx}, ${dy}) ${s.initTransform}`);
@@ -583,34 +583,34 @@ export function select(svg) {
                 const cx = s.initCx || (s.bbox.x + s.bbox.width/2);
                 const cy = s.initCy || (s.bbox.y + s.bbox.height/2);
                 
-                // Calculate angle relative to center
-                // Center in screen space is (cx + tx, cy + ty)
-                // Note: If scale is present, center is affected?
-                // The cx/cy from parseTransform are in un-rotated space.
-                // If scaled, the center logic might need adjustment? 
-                // Currently ignoring scale impact on rotation center for simplicity, assuming center of bbox.
                 
-                const centerX = cx * s.initSx + s.initTx; // Adjusted for scale
+                
+                
+                
+                
+                
+                
+                const centerX = cx * s.initSx + s.initTx; 
                 const centerY = cy * s.initSy + s.initTy;
                 
-                // Actually, if we use the visual center of the bbox:
+                
                 const visualCx = (s.bbox.x + s.bbox.width/2) * s.initSx + s.initTx;
                 const visualCy = (s.bbox.y + s.bbox.height/2) * s.initSy + s.initTy;
                 
                 const angle = Math.atan2(pos.y - visualCy, pos.x - visualCx) * 180 / Math.PI + 90;
                 
-                // Update transform
+                
                 let tStr = `translate(${s.initTx}, ${s.initTy}) rotate(${angle}, ${(s.bbox.x + s.bbox.width/2) * s.initSx}, ${(s.bbox.y + s.bbox.height/2) * s.initSy})`;
                 if (s.initSx !== 1 || s.initSy !== 1) {
-                    // For rotation center to be correct with scale, it's easiest to rotate around scaled center
-                    // We updated the rotate center args above.
+                    
+                    
                     tStr += ` scale(${s.initSx}, ${s.initSy})`;
                 }
                 
                 s.el.setAttribute("transform", tStr);
                 transformGroup.setAttribute("transform", tStr);
             } else {
-                // Multi-rotate
+                
                 const cx = groupBounds.cx;
                 const cy = groupBounds.cy;
                 const angle = Math.atan2(pos.y - cy, pos.x - cx) * 180 / Math.PI + 90;
@@ -626,7 +626,7 @@ export function select(svg) {
             if (selectedElements.length === 1) {
                 const s = elementStates[0];
                 
-                // 1. Calculate local delta (rotated to align with element axes)
+                
                 let ldx = dx;
                 let ldy = dy;
                 if (s.initRot) {
@@ -638,7 +638,7 @@ export function select(svg) {
                 }
                 
                 if (s.tagName === 'rect' || s.tagName === 'image') {
-                    // Existing Rect Logic (omitted for brevity, unchanged)
+                    
                     let anchorX = s.initX;
                     let anchorY = s.initY;
                     
@@ -681,10 +681,10 @@ export function select(svg) {
                     
                     updateTransformHandles();
                 } else {
-                    // Path/Polygon Resize Logic using Scale
                     
-                    // 1. Calculate new Visual Width/Height
-                    // s.initWidth is the visual width at start of drag (includes previous scale)
+                    
+                    
+                    
                     let newVisualW = s.initWidth;
                     let newVisualH = s.initHeight;
                     
@@ -693,29 +693,29 @@ export function select(svg) {
                     if (resizeHandle.includes('w')) newVisualW -= ldx;
                     if (resizeHandle.includes('n')) newVisualH -= ldy;
                     
-                    // Avoid zero/negative size
+                    
                     if (newVisualW < 1) newVisualW = 1;
                     if (newVisualH < 1) newVisualH = 1;
                     
-                    // 2. Calculate New Scale Factors
-                    // Scale relative to the original local bbox
+                    
+                    
                     const sx = newVisualW / s.bbox.width;
                     const sy = newVisualH / s.bbox.height;
                     
-                    // 3. Anchor Logic to calculate new Translation
-                    // We need to keep the Anchor Point fixed in Global Space.
                     
-                    // Determine Anchor Point in "Scaled Local Space" (Visual Space before Rotation)
-                    // If resizing West, Anchor is East.
-                    let anchorLocalX_scaled = s.initX * s.initSx; // Start with old visual pos
+                    
+                    
+                    
+                    
+                    let anchorLocalX_scaled = s.initX * s.initSx; 
                     let anchorLocalY_scaled = s.initY * s.initSy;
                     
-                    if (resizeHandle.includes('w')) anchorLocalX_scaled = (s.initX + s.bbox.width) * s.initSx; // East edge (old visual)
-                    if (resizeHandle.includes('n')) anchorLocalY_scaled = (s.initY + s.bbox.height) * s.initSy; // South edge (old visual)
+                    if (resizeHandle.includes('w')) anchorLocalX_scaled = (s.initX + s.bbox.width) * s.initSx; 
+                    if (resizeHandle.includes('n')) anchorLocalY_scaled = (s.initY + s.bbox.height) * s.initSy; 
                     
-                    // Global Anchor Position (Fixed)
-                    // Apply Rotate + Translate to the scaled anchor
-                    // Center of rotation for the object is the visual center
+                    
+                    
+                    
                     const oldVisualCx = (s.bbox.x + s.bbox.width/2) * s.initSx;
                     const oldVisualCy = (s.bbox.y + s.bbox.height/2) * s.initSy;
                     
@@ -723,34 +723,34 @@ export function select(svg) {
                     globalAnchor.x += s.initTx;
                     globalAnchor.y += s.initTy;
                     
-                    // New Local Anchor Position (after NEW scale)
-                    // If resizing West, Anchor is East. East edge corresponds to (bbox.x + bbox.width).
-                    // So in new scaled space, it is at (bbox.x + bbox.width) * sx.
+                    
+                    
+                    
                     let newAnchorX_scaled = s.initX * sx;
                     let newAnchorY_scaled = s.initY * sy;
                     
                     if (resizeHandle.includes('w')) newAnchorX_scaled = (s.initX + s.bbox.width) * sx;
                     if (resizeHandle.includes('n')) newAnchorY_scaled = (s.initY + s.bbox.height) * sy;
                     
-                    // New Center of rotation (Visual Center with new scale)
+                    
                     const newVisualCx = (s.bbox.x + s.bbox.width/2) * sx;
                     const newVisualCy = (s.bbox.y + s.bbox.height/2) * sy;
                     
-                    // Calculate where this new anchor would be if we just rotated (without new translation)
+                    
                     const rotatedNewAnchor = rotatePoint(newAnchorX_scaled, newAnchorY_scaled, newVisualCx, newVisualCy, s.initRot);
                     
-                    // The difference is the new Translation needed
+                    
                     const newTx = globalAnchor.x - rotatedNewAnchor.x;
                     const newTy = globalAnchor.y - rotatedNewAnchor.y;
                     
-                    // Construct final transform
-                    // translate(newTx, newTy) rotate(angle, newVisualCx, newVisualCy) scale(sx, sy)
-                    // Note: SVG rotate(a, cx, cy) is around (cx, cy) in the user space *before* rotation.
-                    // Since we apply scale *after* rotate in string order (right-to-left application? NO).
-                    // SVG transform="translate T rotate R scale S" means T * R * S * point.
-                    // So Scale is applied first.
-                    // Then Rotate is applied. The center (cx, cy) for rotate must be in the SCALED space.
-                    // Yes, newVisualCx/Cy are in scaled space.
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
                     
                     const tStr = `translate(${newTx}, ${newTy}) rotate(${s.initRot}, ${newVisualCx}, ${newVisualCy}) scale(${sx}, ${sy})`;
                     
@@ -760,7 +760,7 @@ export function select(svg) {
                     updateTransformHandles();
                 }
             } else {
-                // Multi Element Resize (unchanged)
+                
                 const currentW = groupBounds.width;
                 const currentH = groupBounds.height;
                 
@@ -796,7 +796,7 @@ export function select(svg) {
     function onMouseUp(evt) {
         if (!isDragging) return;
 
-        // History support for Select Tool
+        
         if (dragMode === 'move' || dragMode === 'resize' || dragMode === 'rotate' || dragMode === 'vertex') {
             const changes = [];
             
@@ -812,7 +812,7 @@ export function select(svg) {
                 
                 if (dragMode === 'vertex') {
                     const currentD = el.getAttribute('d');
-                    // Reconstruct oldD from initPoints
+                    
                     const oldD = buildPathData(s.initPoints); 
                     
                     if (currentD !== oldD) {
@@ -827,7 +827,7 @@ export function select(svg) {
                     const currentW = parseFloat(el.getAttribute("width") || 0);
                     const currentH = parseFloat(el.getAttribute("height") || 0);
                     
-                    // Allow small float diff?
+                    
                     if (currentX !== s.initX || currentY !== s.initY || currentW !== s.initWidth || currentH !== s.initHeight) {
                         changed = true;
                         change.oldX = s.initX; change.newX = currentX;
@@ -852,7 +852,7 @@ export function select(svg) {
                             
                             if (c.isVertex) {
                                 c.el.setAttribute("d", c.oldD);
-                                // Update vertex handles if selected
+                                
                                 if (selectedElements.length === 1 && selectedElements[0] === c.el) {
                                     createVertexHandles(c.el);
                                 }
@@ -908,7 +908,7 @@ export function select(svg) {
                 
                 try {
                     const bbox = getElementGlobalBounds(el);
-                    // Simple AABB intersection
+                    
                     if (r1.x < bbox.x + bbox.width &&
                         r1.x + r1.w > bbox.x &&
                         r1.y < bbox.y + bbox.height &&
@@ -926,7 +926,7 @@ export function select(svg) {
         dragMode = null;
     }
 
-    // Observer for external removals (e.g. Undo)
+    
     const observer = new MutationObserver((mutations) => {
         let needsUpdate = false;
         mutations.forEach((mutation) => {
@@ -947,7 +947,7 @@ export function select(svg) {
     
     observer.observe(svg, { childList: true });
 
-    // Attach listeners
+    
     svg.addEventListener("mousedown", onMouseDown);
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
