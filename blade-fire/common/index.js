@@ -21,6 +21,8 @@ export function createGrid(svg, width, height, gridSize) {
 
   const rect = document.createElementNS(svgNS, "rect");
   rect.setAttribute("class", "grid-rect");
+  rect.setAttribute("id", "grid-background");
+  rect.setAttribute("data-is-grid", "true");
   rect.setAttribute("width", "100%");
   rect.setAttribute("height", "100%");
   rect.setAttribute("fill", "url(#grid)");
