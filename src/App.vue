@@ -3,23 +3,26 @@
     <a-layout-sider theme="light" width="200" class="left-sider">
       <div class="toolbar">
         <div class="toolbar-title">工具</div>
-        <a-button block class="tool-btn" :type="currentTool === 'select' ? 'primary' : 'default'" @click="selectTool('select')">Select</a-button>
-        <a-button block class="tool-btn" :type="currentTool === 'circle' ? 'primary' : 'default'" @click="selectTool('circle')">Circle</a-button>
-        <a-button block class="tool-btn" :type="currentTool === 'rect' ? 'primary' : 'default'" @click="selectTool('rect')">Rect</a-button>
-        <a-button block class="tool-btn" :type="currentTool === 'triangle' ? 'primary' : 'default'" @click="selectTool('triangle')">Triangle</a-button>
-        <a-button block class="tool-btn" :type="currentTool === 'polygon' ? 'primary' : 'default'" @click="selectTool('polygon')">Polygon</a-button>
+        <a-button block class="tool-btn" :type="currentTool === 'select' ? 'primary' : 'default'"
+          @click="selectTool('select')">Select</a-button>
+        <a-button block class="tool-btn" :type="currentTool === 'circle' ? 'primary' : 'default'"
+          @click="selectTool('circle')">Circle</a-button>
+        <a-button block class="tool-btn" :type="currentTool === 'rect' ? 'primary' : 'default'"
+          @click="selectTool('rect')">Rect</a-button>
+        <a-button block class="tool-btn" :type="currentTool === 'triangle' ? 'primary' : 'default'"
+          @click="selectTool('triangle')">Triangle</a-button>
+        <a-button block class="tool-btn" :type="currentTool === 'polygon' ? 'primary' : 'default'"
+          @click="selectTool('polygon')">Polygon</a-button>
         <!-- <a-button block class="tool-btn" :type="currentTool === 'text' ? 'primary' : 'default'" @click="selectTool('text')">Text</a-button> -->
       </div>
     </a-layout-sider>
     <a-layout-content class="content-area">
-       <div id="map-container"></div>
+      <div id="map-container"></div>
     </a-layout-content>
     <a-layout-sider theme="light" width="300" class="right-sider">
       <div class="properties-panel">
         <div class="panel-title">属性</div>
         <div class="panel-content">
-          <!-- Properties panel placeholder -->
-          <p style="text-align: center; color: #999; margin-top: 20px;">Select an element to view properties</p>
         </div>
       </div>
     </a-layout-sider>
@@ -36,13 +39,13 @@ let activeToolCleanup = null
 const selectTool = (tool) => {
   // If clicking the same tool, do nothing or toggle? 
   // For now, let's assume re-selecting resets the tool.
-  
+
   // Cleanup previous tool
   if (activeToolCleanup) {
     activeToolCleanup()
     activeToolCleanup = null
   }
-  
+
   currentTool.value = tool
   if (BladeFire[tool]) {
     const cleanup = BladeFire[tool]()
@@ -95,7 +98,8 @@ onMounted(() => {
   gap: 12px;
 }
 
-.toolbar-title, .panel-title {
+.toolbar-title,
+.panel-title {
   font-weight: bold;
   margin-bottom: 10px;
   font-size: 16px;
