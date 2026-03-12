@@ -1,3 +1,4 @@
+import { createGrid, enableZoom } from "./common/index.js";
 class BladeFire {
     version = "1.0.0";
     static init(config) {
@@ -8,6 +9,16 @@ class BladeFire {
             svg.setAttribute("width", "100%");
             svg.setAttribute("height", "100%");
             container.appendChild(svg);
+
+            if (config.grid) {
+                const gridSize = config.gridSize || 20;
+                createGrid(svg, container.offsetWidth, container.offsetHeight, gridSize);
+            }
+
+            if (config.zoom) {
+                enableZoom(svg);
+            }
+
             return svg;
         }
     }
@@ -34,3 +45,5 @@ class BladeFire {
         console.log("Draw an image");
     }
 }
+
+export { BladeFire };
