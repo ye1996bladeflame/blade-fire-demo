@@ -4,13 +4,11 @@
       <div class="toolbar">
         <div class="toolbar-title">工具</div>
         <a-button block class="tool-btn" :type="currentTool === 'select' ? 'primary' : 'default'" @click="selectTool('select')">Select</a-button>
-        <a-button block class="tool-btn" :type="currentTool === 'line' ? 'primary' : 'default'" @click="selectTool('line')">Line</a-button>
         <a-button block class="tool-btn" :type="currentTool === 'circle' ? 'primary' : 'default'" @click="selectTool('circle')">Circle</a-button>
         <a-button block class="tool-btn" :type="currentTool === 'rect' ? 'primary' : 'default'" @click="selectTool('rect')">Rect</a-button>
         <a-button block class="tool-btn" :type="currentTool === 'triangle' ? 'primary' : 'default'" @click="selectTool('triangle')">Triangle</a-button>
         <a-button block class="tool-btn" :type="currentTool === 'polygon' ? 'primary' : 'default'" @click="selectTool('polygon')">Polygon</a-button>
-        <a-button block class="tool-btn" :type="currentTool === 'text' ? 'primary' : 'default'" @click="selectTool('text')">Text</a-button>
-        <a-button block class="tool-btn" :type="currentTool === 'image' ? 'primary' : 'default'" @click="selectTool('image')">Image</a-button>
+        <!-- <a-button block class="tool-btn" :type="currentTool === 'text' ? 'primary' : 'default'" @click="selectTool('text')">Text</a-button> -->
       </div>
     </a-layout-sider>
     <a-layout-content class="content-area">

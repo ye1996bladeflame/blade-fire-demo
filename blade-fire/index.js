@@ -1,11 +1,9 @@
 import { createGrid, enableZoom } from "./common/index.js";
-import { line } from "./tools/line.js";
 import { circle } from "./tools/circle.js";
 import { rect } from "./tools/rect.js";
 import { triangle } from "./tools/triangle.js";
 import { polygon } from "./tools/polygon.js";
 import { text } from "./tools/text.js";
-import { image } from "./tools/image.js";
 import { select } from "./tools/select.js";
 import { enableDrag } from "./tools/drag.js";
 
@@ -38,10 +36,6 @@ class BladeFire {
             return svg;
         }
     }
-
-    static line() {
-        return line(this.svg);
-    }
     static circle() {
         return circle(this.svg);
     }
@@ -56,9 +50,6 @@ class BladeFire {
     }
     static text() {
         return text(this.svg);
-    }
-    static image() {
-        return image(this.svg);
     }
     static select() {
         return select(this.svg);
