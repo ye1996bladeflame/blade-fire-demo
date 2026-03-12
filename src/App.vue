@@ -2,7 +2,8 @@
   <a-layout class="layout-container">
     <a-layout-sider theme="light" width="200" class="left-sider">
       <div class="toolbar">
-        <div class="toolbar-title">Tools</div>
+        <div class="toolbar-title">工具</div>
+        <a-button block class="tool-btn" :type="currentTool === 'select' ? 'primary' : 'default'" @click="selectTool('select')">Select</a-button>
         <a-button block class="tool-btn" :type="currentTool === 'line' ? 'primary' : 'default'" @click="selectTool('line')">Line</a-button>
         <a-button block class="tool-btn" :type="currentTool === 'circle' ? 'primary' : 'default'" @click="selectTool('circle')">Circle</a-button>
         <a-button block class="tool-btn" :type="currentTool === 'rect' ? 'primary' : 'default'" @click="selectTool('rect')">Rect</a-button>
@@ -17,7 +18,7 @@
     </a-layout-content>
     <a-layout-sider theme="light" width="300" class="right-sider">
       <div class="properties-panel">
-        <div class="panel-title">Properties</div>
+        <div class="panel-title">属性</div>
         <div class="panel-content">
           <!-- Properties panel placeholder -->
           <p style="text-align: center; color: #999; margin-top: 20px;">Select an element to view properties</p>

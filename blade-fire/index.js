@@ -6,6 +6,7 @@ import { triangle } from "./tools/triangle.js";
 import { polygon } from "./tools/polygon.js";
 import { text } from "./tools/text.js";
 import { image } from "./tools/image.js";
+import { select } from "./tools/select.js";
 
 class BladeFire {
     version = "1.0.0";
@@ -38,6 +39,7 @@ class BladeFire {
     static polygon = polygon;
     static text = text;
     static image = image;
+    static select = select;
 }
 
 export { BladeFire };
