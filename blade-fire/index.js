@@ -1,7 +1,15 @@
 class BladeFire {
     version = "1.0.0";
-    static init() {
-        console.log("BladeFire initialized");
+    static init(config) {
+        const container = document.getElementById(config.container);
+        if (container) {
+            const svgNS = "http://www.w3.org/2000/svg";
+            const svg = document.createElementNS(svgNS, "svg");
+            svg.setAttribute("width", "100%");
+            svg.setAttribute("height", "100%");
+            container.appendChild(svg);
+            return svg;
+        }
     }
 
     static line() {
