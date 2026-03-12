@@ -333,6 +333,11 @@ export function select(svg) {
         isDragging = true;
         const target = evt.target;
 
+        // Ignore clicks on or inside a foreignObject
+        if (target.closest('foreignObject')) {
+            return;
+        }
+
         // 1. Check Handle Click
         if (target.parentNode === transformGroup && target.dataset.type) {
             dragMode = target.dataset.type === 'rotate' ? 'rotate' : 'resize';
@@ -662,7 +667,7 @@ export function select(svg) {
             
             const children = Array.from(svg.children);
             for (let el of children) {
-                if (el.tagName === 'defs' || el.tagName === 'g' || el.id === 'grid-background' || el.getAttribute('data-is-grid') === 'true') continue;
+                if (el.tagName === 'defs' || el.tagName === 'g' || el.tagName === 'foreignObject' || el.id === 'grid-background' || el.getAttribute('data-is-grid') === 'true') continue;
                 
                 try {
                     const bbox = getElementGlobalBounds(el);
