@@ -1,4 +1,4 @@
-import { setCursor } from "../common/index.js";
+import { setCursor, history } from "../common/index.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -795,6 +795,99 @@ export function select(svg) {
 
     function onMouseUp(evt) {
         if (!isDragging) return;
+
+        // History support for Select Tool
+        if (dragMode === 'move' || dragMode === 'resize' || dragMode === 'rotate' || dragMode === 'vertex') {
+            const changes = [];
+            
+            elementStates.forEach(s => {
+                const el = s.el;
+                const currentTransform = el.getAttribute("transform") || "";
+                const oldTransform = s.initTransform || "";
+                
+                let changed = false;
+                const change = { el, oldTransform, newTransform: currentTransform };
+                
+                if (currentTransform !== oldTransform) changed = true;
+                
+                if (dragMode === 'vertex') {
+                    const currentD = el.getAttribute('d');
+                    // Reconstruct oldD from initPoints
+                    const oldD = buildPathData(s.initPoints); 
+                    
+                    if (currentD !== oldD) {
+                        changed = true;
+                        change.oldD = oldD;
+                        change.newD = currentD;
+                        change.isVertex = true;
+                    }
+                } else if (dragMode === 'resize' && (el.tagName === 'rect' || el.tagName === 'image')) {
+                    const currentX = parseFloat(el.getAttribute("x") || 0);
+                    const currentY = parseFloat(el.getAttribute("y") || 0);
+                    const currentW = parseFloat(el.getAttribute("width") || 0);
+                    const currentH = parseFloat(el.getAttribute("height") || 0);
+                    
+                    // Allow small float diff?
+                    if (currentX !== s.initX || currentY !== s.initY || currentW !== s.initWidth || currentH !== s.initHeight) {
+                        changed = true;
+                        change.oldX = s.initX; change.newX = currentX;
+                        change.oldY = s.initY; change.newY = currentY;
+                        change.oldW = s.initWidth; change.newW = currentW;
+                        change.oldH = s.initHeight; change.newH = currentH;
+                        change.isRect = true;
+                    }
+                }
+                
+                if (changed) {
+                    changes.push(change);
+                }
+            });
+            
+            if (changes.length > 0) {
+                history.push({
+                    undo: () => {
+                        changes.forEach(c => {
+                            if (c.oldTransform) c.el.setAttribute("transform", c.oldTransform);
+                            else c.el.removeAttribute("transform");
+                            
+                            if (c.isVertex) {
+                                c.el.setAttribute("d", c.oldD);
+                                // Update vertex handles if selected
+                                if (selectedElements.length === 1 && selectedElements[0] === c.el) {
+                                    createVertexHandles(c.el);
+                                }
+                            } else if (c.isRect) {
+                                c.el.setAttribute("x", c.oldX);
+                                c.el.setAttribute("y", c.oldY);
+                                c.el.setAttribute("width", c.oldW);
+                                c.el.setAttribute("height", c.oldH);
+                            }
+                        });
+                        updateTransformHandles();
+                    },
+                    redo: () => {
+                        changes.forEach(c => {
+                            if (c.newTransform) c.el.setAttribute("transform", c.newTransform);
+                            else c.el.removeAttribute("transform");
+                            
+                            if (c.isVertex) {
+                                c.el.setAttribute("d", c.newD);
+                                if (selectedElements.length === 1 && selectedElements[0] === c.el) {
+                                    createVertexHandles(c.el);
+                                }
+                            } else if (c.isRect) {
+                                c.el.setAttribute("x", c.newX);
+                                c.el.setAttribute("y", c.newY);
+                                c.el.setAttribute("width", c.newW);
+                                c.el.setAttribute("height", c.newH);
+                            }
+                        });
+                        updateTransformHandles();
+                    }
+                });
+            }
+        }
+
         isDragging = false;
         setCursor(svg, "default");
 
@@ -833,6 +926,27 @@ export function select(svg) {
         dragMode = null;
     }
 
+    // Observer for external removals (e.g. Undo)
+    const observer = new MutationObserver((mutations) => {
+        let needsUpdate = false;
+        mutations.forEach((mutation) => {
+            if (mutation.type === 'childList') {
+                mutation.removedNodes.forEach((node) => {
+                    const index = selectedElements.indexOf(node);
+                    if (index > -1) {
+                        selectedElements.splice(index, 1);
+                        needsUpdate = true;
+                    }
+                });
+            }
+        });
+        if (needsUpdate) {
+            updateTransformHandles();
+        }
+    });
+    
+    observer.observe(svg, { childList: true });
+
     // Attach listeners
     svg.addEventListener("mousedown", onMouseDown);
     window.addEventListener("mousemove", onMouseMove);
@@ -840,6 +954,7 @@ export function select(svg) {
 
     return () => {
         console.log("Select tool deactivated");
+        observer.disconnect();
         svg.removeEventListener("mousedown", onMouseDown);
         window.removeEventListener("mousemove", onMouseMove);
         window.removeEventListener("mouseup", onMouseUp);

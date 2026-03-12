@@ -1,4 +1,4 @@
-import { setCursor } from "../common/index.js";
+import { setCursor, history } from "../common/index.js";
 
 let isDrawing = false;
 let startX, startY;
@@ -62,6 +62,19 @@ function onMouseMove(evt) {
 function onMouseUp(evt) {
     if (isDrawing) {
         isDrawing = false;
+        if (currentCircle) {
+             const rx = parseFloat(currentCircle.getAttribute("rx"));
+             const ry = parseFloat(currentCircle.getAttribute("ry"));
+             if (rx > 0 && ry > 0) {
+                 const circle = currentCircle;
+                 history.push({
+                     undo: () => circle.remove(),
+                     redo: () => svgElement.appendChild(circle)
+                 });
+             } else {
+                 currentCircle.remove();
+             }
+        }
         currentCircle = null;
         console.log("Circle drawn");
     }

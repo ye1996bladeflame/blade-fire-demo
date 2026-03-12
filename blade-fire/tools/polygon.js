@@ -1,4 +1,4 @@
-import { setCursor, getOverlayLayer } from "../common/index.js";
+import { setCursor, getOverlayLayer, history } from "../common/index.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -9,6 +9,7 @@ export function polygon(svg) {
     }
 
     // State
+    let isToolActive = true;
     let points = [];
     let activePath = null;
     let toolGroup = null;
@@ -17,6 +18,49 @@ export function polygon(svg) {
     let snapIndicator = null; // Visual for snap point
     let viewChangeObserver = null;
     let lastMouseMoveEvent = null;
+
+    function restoreDrawingState(savedPoints, path) {
+        points = savedPoints;
+        activePath = path;
+
+        // Recreate tool group and helpers
+        toolGroup = createSVGElement("g", { "pointer-events": "none" });
+        svg.appendChild(toolGroup);
+
+        const startPoint = points[0];
+        startPointMarker = createSVGElement("circle", {
+            "cx": startPoint.x,
+            "cy": startPoint.y,
+            "r": 5,
+            "fill": "rgba(0, 255, 0, 0.5)",
+            "stroke": "green",
+            "pointer-events": "all",
+            "cursor": "pointer"
+        });
+        svg.appendChild(startPointMarker); // Append to svg to catch events
+
+        const lastPoint = points[points.length - 1];
+        guideLine = createSVGElement("line", {
+            "x1": lastPoint.x,
+            "y1": lastPoint.y,
+            "x2": lastPoint.x,
+            "y2": lastPoint.y,
+            "stroke": "green",
+            "stroke-width": "1",
+            "stroke-dasharray": "5,5"
+        });
+        toolGroup.appendChild(guideLine);
+
+        // Observe view changes
+        if (viewChangeObserver) viewChangeObserver.disconnect();
+        viewChangeObserver = new MutationObserver(() => {
+            if (snapIndicator) {
+                snapIndicator.setAttribute("r", 5 / (svg.getScreenCTM().a || 1));
+                snapIndicator.setAttribute("stroke-width", 2 / (svg.getScreenCTM().a || 1));
+            }
+        });
+        viewChangeObserver.observe(svg, { attributes: true, attributeFilter: ['viewBox', 'width', 'height'] });
+    }
 
     // Find the nearest vertex to snap to
     function findSnapPoint(mousePos, snapRadius = 10) {
@@ -134,6 +178,44 @@ export function polygon(svg) {
         activePath.setAttribute("d", d);
         activePath.setAttribute("fill", "transparent");
         
+        const savedPoints = [...points];
+        const path = activePath;
+        
+        history.push({
+            undo: () => {
+                if (isToolActive) {
+                    // Restore activePath ref
+                    activePath = path;
+                    
+                    // Restore drawing state
+                    restoreDrawingState(savedPoints, path);
+                    
+                    // Open the path (remove Z)
+                    let d = path.getAttribute("d");
+                    if (d.match(/Z\s*$/i)) {
+                         d = d.replace(/\s*Z\s*$/i, "");
+                         path.setAttribute("d", d);
+                    }
+                    path.setAttribute("fill", "none");
+                } else {
+                    path.remove();
+                }
+            },
+            redo: () => {
+                if (isToolActive) {
+                     // Close again
+                     let d = path.getAttribute("d");
+                     if (!d.match(/Z\s*$/i)) d += " Z";
+                     path.setAttribute("d", d);
+                     path.setAttribute("fill", "transparent");
+                     
+                     resetState(false);
+                } else {
+                     svg.appendChild(path);
+                }
+            }
+        });
+
         resetState(false); // false = don't remove the path element
     }
 
@@ -145,8 +227,13 @@ export function polygon(svg) {
             toolGroup.remove();
             toolGroup = null;
         }
+        // Properly remove startPointMarker from DOM
+        if (startPointMarker) {
+            startPointMarker.remove();
+            startPointMarker = null;
+        }
+        
         guideLine = null;
-        startPointMarker = null;
         snapIndicator = null;
 
         if (viewChangeObserver) {
@@ -159,6 +246,19 @@ export function polygon(svg) {
     }
 
     function onMouseDown(evt) {
+        // Right click handling
+        if (evt.button === 2) {
+            if (points.length >= 3) {
+                closePolygon();
+            } else {
+                // Cancel drawing if less than 3 points
+                resetState();
+            }
+            evt.stopPropagation();
+            evt.preventDefault();
+            return;
+        }
+
         if (evt.button !== 0) return;
 
         let pos = getMousePos(evt);
@@ -198,126 +298,180 @@ export function polygon(svg) {
                 "stroke-linecap": "round"
             });
             svg.appendChild(activePath);
-
-            // Create tool group
-            toolGroup = createSVGElement("g", {
-                "pointer-events": "none"
-            });
+            
+            // Create tool group for helpers
+            toolGroup = createSVGElement("g", { "pointer-events": "none" });
             svg.appendChild(toolGroup);
 
-            // Create guide line (SVG Line)
+            // Start point marker
+            startPointMarker = createSVGElement("circle", {
+                "cx": pos.x,
+                "cy": pos.y,
+                "r": 5,
+                "fill": "rgba(0, 255, 0, 0.5)",
+                "stroke": "green",
+                "pointer-events": "all",
+                "cursor": "pointer"
+            });
+            svg.appendChild(startPointMarker); // Append to svg to catch events
+
+            // Guide line
             guideLine = createSVGElement("line", {
-                stroke: "red",
-                "stroke-dasharray": "5,5",
-                "pointer-events": "none"
+                "x1": pos.x,
+                "y1": pos.y,
+                "x2": pos.x,
+                "y2": pos.y,
+                "stroke": "green",
+                "stroke-width": "1",
+                "stroke-dasharray": "5,5"
             });
             toolGroup.appendChild(guideLine);
 
-            // Create start point marker (SVG Circle)
-            startPointMarker = createSVGElement("circle", {
-                fill: "white",
-                stroke: "red",
-                cursor: "pointer",
-                "pointer-events": "auto" // Enable click
+            // Observe view changes
+            viewChangeObserver = new MutationObserver(() => {
+                if (snapIndicator) {
+                    snapIndicator.setAttribute("r", 5 / (svg.getScreenCTM().a || 1));
+                    snapIndicator.setAttribute("stroke-width", 2 / (svg.getScreenCTM().a || 1));
+                }
             });
-            updateMarkerAttr(startPointMarker, pos);
-            toolGroup.appendChild(startPointMarker);
+            viewChangeObserver.observe(svg, { attributes: true, attributeFilter: ['viewBox', 'width', 'height'] });
 
-            // Add viewBox observer
-            handleViewBoxChange(); // Initial call
-            viewChangeObserver = new MutationObserver(handleViewBoxChange);
-            viewChangeObserver.observe(svg, { attributes: true, attributeFilter: ['viewBox'] });
-        }
-
-        updatePath();
-    }
-
-    // Helper to map SVG coord to SVG attributes (handling scale)
-    function updateMarkerAttr(el, svgPos) {
-        const CTM = svg.getScreenCTM();
-        const scale = 1 / CTM.a;
-        el.setAttribute("cx", svgPos.x);
-        el.setAttribute("cy", svgPos.y);
-        el.setAttribute("r", 5 * scale);
-        el.setAttribute("stroke-width", 2 * scale);
-    }
-
-    function handleViewBoxChange() {
-        if (lastMouseMoveEvent) {
-            handleMouseMove(lastMouseMoveEvent);
-        } else if (points.length > 0) {
-             // Force update if we have points but no mouse move yet (e.g. initial zoom)
-             if (startPointMarker) updateMarkerAttr(startPointMarker, points[0]);
-        }
-    }
-
-    function updateGuideLineAttr(el, p1, p2) {
-        const CTM = svg.getScreenCTM();
-        const scale = 1 / CTM.a;
-        el.setAttribute("x1", p1.x);
-        el.setAttribute("y1", p1.y);
-        el.setAttribute("x2", p2.x);
-        el.setAttribute("y2", p2.y);
-        el.setAttribute("stroke-width", 1 * scale);
-    }
-
-    function handleMouseMove(evt) {
-        lastMouseMoveEvent = evt; // Store last event
-        if (!points.length) return;
-
-        if (snapIndicator) {
-            snapIndicator.remove();
-            snapIndicator = null;
-        }
-
-        let pos = getMousePos(evt);
-        const snapPoint = findSnapPoint(pos);
-
-        if (snapPoint) {
-            pos = snapPoint;
-            snapIndicator = createSVGElement("circle", {
-                fill: "none",
-                stroke: "blue",
-                "pointer-events": "none"
-            });
-            if (toolGroup) toolGroup.appendChild(snapIndicator);
-            updateMarkerAttr(snapIndicator, pos);
-        }
-
-        // Update guide line and start marker
-        if (guideLine) {
-            const lastPoint = points[points.length - 1];
-            updateGuideLineAttr(guideLine, lastPoint, pos);
-        }
-        if (startPointMarker) {
-            updateMarkerAttr(startPointMarker, points[0]);
+        } else {
+            updatePath();
+            // Update guide line start
+            guideLine.setAttribute("x1", pos.x);
+            guideLine.setAttribute("y1", pos.y);
+            guideLine.setAttribute("x2", pos.x);
+            guideLine.setAttribute("y2", pos.y);
         }
     }
 
     function onMouseMove(evt) {
-        handleMouseMove(evt);
+        lastMouseMoveEvent = evt;
+        if (!activePath) return;
+
+        let pos = getMousePos(evt);
+        
+        // Snapping logic for guide line end
+        const snapRadius = 10;
+        let snapped = false;
+
+        // 1. Snap to start point
+        if (points.length >= 2) {
+            const startPoint = points[0];
+            const CTM = svg.getScreenCTM();
+            const mouseScreen = { x: pos.x * CTM.a + CTM.e, y: pos.y * CTM.d + CTM.f };
+            const startScreen = { x: startPoint.x * CTM.a + CTM.e, y: startPoint.y * CTM.d + CTM.f };
+            const dx = mouseScreen.x - startScreen.x;
+            const dy = mouseScreen.y - startScreen.y;
+            
+            if (Math.sqrt(dx * dx + dy * dy) < snapRadius) {
+                pos = startPoint;
+                snapped = true;
+            }
+        }
+
+        // 2. Snap to external vertices
+        if (!snapped) {
+            const externalSnapPoint = findSnapPoint(pos);
+            if (externalSnapPoint) {
+                pos = externalSnapPoint;
+                snapped = true;
+            }
+        }
+
+        // Update snap indicator
+        if (snapped) {
+            if (!snapIndicator) {
+                snapIndicator = createSVGElement("circle", {
+                    "r": 5 / (svg.getScreenCTM().a || 1),
+                    "fill": "none",
+                    "stroke": "orange",
+                    "stroke-width": 2 / (svg.getScreenCTM().a || 1)
+                });
+                toolGroup.appendChild(snapIndicator);
+            }
+            snapIndicator.setAttribute("cx", pos.x);
+            snapIndicator.setAttribute("cy", pos.y);
+            snapIndicator.style.display = "block";
+        } else if (snapIndicator) {
+            snapIndicator.style.display = "none";
+        }
+
+        // Update guide line
+        guideLine.setAttribute("x2", pos.x);
+        guideLine.setAttribute("y2", pos.y);
+    }
+
+    function onDblClick(evt) {
+        // Double click to close
+        closePolygon();
     }
 
     function onContextMenu(evt) {
         evt.preventDefault();
-        if (points.length >= 3) {
-            closePolygon();
-        } else if (points.length > 0) {
-            resetState();
+        evt.stopPropagation();
+        return false;
+    }
+
+    function onKeyDown(evt) {
+        // Check for Undo (Ctrl+Z)
+        if ((evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase() === 'z' && !evt.shiftKey) {
+            if (activePath && points.length > 0) {
+                // Remove last point
+                points.pop();
+                
+                if (points.length < 2) {
+                    // Cancel drawing if less than 2 points left (avoid single point state)
+                    resetState();
+                } else {
+                    // Redraw path
+                    let d = `M ${points[0].x} ${points[0].y}`;
+                    for (let i = 1; i < points.length; i++) {
+                        d += ` L ${points[i].x} ${points[i].y}`;
+                    }
+                    activePath.setAttribute("d", d);
+                    
+                    // Update guide line start position
+                    if (guideLine) {
+                        const lastPoint = points[points.length - 1];
+                        guideLine.setAttribute("x1", lastPoint.x);
+                        guideLine.setAttribute("y1", lastPoint.y);
+                        
+                        // We also need to trigger a mouse move update to fix x2, y2 based on current mouse pos
+                        // But we don't have event here.
+                        // However, if the user moves mouse slightly, it will correct.
+                        // Or we can just leave x2,y2 as is (it points to cursor).
+                        // Since cursor didn't move, x2,y2 should remain at cursor.
+                        // But x1,y1 changed to previous point.
+                    }
+                }
+                
+                // Stop global undo
+                evt.stopPropagation();
+                evt.preventDefault();
+            }
         }
     }
 
-    // Attach listeners
     svg.addEventListener("mousedown", onMouseDown);
     svg.addEventListener("mousemove", onMouseMove);
+    svg.addEventListener("dblclick", onDblClick);
     svg.addEventListener("contextmenu", onContextMenu);
+    window.addEventListener("keydown", onKeyDown, true); // Capture phase to intercept global undo
 
-    // Cleanup function
     return () => {
-        console.log("Polygon tool deactivated");
+        isToolActive = false;
         svg.removeEventListener("mousedown", onMouseDown);
         svg.removeEventListener("mousemove", onMouseMove);
+        svg.removeEventListener("dblclick", onDblClick);
         svg.removeEventListener("contextmenu", onContextMenu);
-        resetState();
+        window.removeEventListener("keydown", onKeyDown, true);
+        
+        // Cleanup active drawing if tool switched
+        if (activePath) {
+            resetState();
+        }
+        console.log("Deactivate polygon tool");
     };
 }

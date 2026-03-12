@@ -1,4 +1,4 @@
-import { setCursor } from "../common/index.js";
+import { setCursor, history } from "../common/index.js";
 
 let isDrawing = false;
 let startX, startY;
@@ -70,6 +70,18 @@ function onMouseMove(evt) {
 function onMouseUp(evt) {
     if (isDrawing) {
         isDrawing = false;
+        if (currentTriangle) {
+             const bbox = currentTriangle.getBBox();
+             if (bbox.width > 0 && bbox.height > 0) {
+                 const triangle = currentTriangle;
+                 history.push({
+                     undo: () => triangle.remove(),
+                     redo: () => svgElement.appendChild(triangle)
+                 });
+             } else {
+                 currentTriangle.remove();
+             }
+        }
         currentTriangle = null;
         console.log("Triangle drawn");
     }
@@ -103,6 +115,6 @@ export function triangle(svg) {
         svgElement.removeEventListener("mousedown", onMouseDown);
         svgElement.removeEventListener("mousemove", onMouseMove);
         svgElement.removeEventListener("mouseup", onMouseUp);
-        console.log("Triangle tool deactivated");
+        console.log("Deactivate triangle tool");
     };
 }

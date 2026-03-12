@@ -1,4 +1,4 @@
-import { setCursor } from "../common/index.js";
+import { setCursor, history } from "../common/index.js";
 
 let svgElement = null;
 let currentInput = null;
@@ -13,11 +13,14 @@ function getMousePosition(evt) {
     };
 }
 
-function startEditing(textNode) {
+function startEditing(textNode, isNew = false) {
     // If already editing, finish that first
     if (currentInput) {
         currentInput.blur();
     }
+
+    const initialContent = textNode.textContent;
+    const isNewText = isNew;
 
     const textContent = textNode.textContent;
     const rect = textNode.getBoundingClientRect();
@@ -62,12 +65,46 @@ function startEditing(textNode) {
         if (!currentInput) return;
         
         const newValue = input.value;
+        const textNodeRef = textNode; // Capture reference
+        
         if (newValue.trim() !== "") {
             textNode.textContent = newValue;
             textNode.style.visibility = "visible";
+            
+            if (isNewText) {
+                // New text created
+                history.push({
+                    undo: () => textNodeRef.remove(),
+                    redo: () => svgElement.appendChild(textNodeRef)
+                });
+            } else if (newValue !== initialContent) {
+                // Existing text modified
+                const oldContent = initialContent;
+                const newContent = newValue;
+                history.push({
+                    undo: () => { textNodeRef.textContent = oldContent; },
+                    redo: () => { textNodeRef.textContent = newContent; }
+                });
+            }
         } else {
             // Remove empty text node
             textNode.remove();
+            
+            if (!isNewText) {
+                 // Existing text removed (edited to empty)
+                 const oldContent = initialContent;
+                 // We need to know where to insert it back? appendChild is safest for now
+                 // or insertBefore if we want to preserve order, but that's harder.
+                 // For now, append back.
+                 history.push({
+                     undo: () => { 
+                         textNodeRef.textContent = oldContent;
+                         textNodeRef.style.visibility = "visible";
+                         svgElement.appendChild(textNodeRef);
+                     },
+                     redo: () => textNodeRef.remove()
+                 });
+            }
         }
         
         input.remove();
@@ -163,7 +200,7 @@ function onMouseDown(evt) {
     // Start editing immediately
     // Use setTimeout to ensure the element is rendered and has dimensions
     setTimeout(() => {
-        startEditing(textNode);
+        startEditing(textNode, true);
     }, 0);
 }
 

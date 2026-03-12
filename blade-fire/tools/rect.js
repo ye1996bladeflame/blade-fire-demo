@@ -1,4 +1,4 @@
-import { setCursor } from "../common/index.js";
+import { setCursor, history } from "../common/index.js";
 
 let isDrawing = false;
 let startX, startY;
@@ -61,6 +61,19 @@ function onMouseMove(evt) {
 function onMouseUp(evt) {
     if (isDrawing) {
         isDrawing = false;
+        if (currentRect) {
+             const width = parseFloat(currentRect.getAttribute("width"));
+             const height = parseFloat(currentRect.getAttribute("height"));
+             if (width > 0 && height > 0) {
+                 const rect = currentRect;
+                 history.push({
+                     undo: () => rect.remove(),
+                     redo: () => svgElement.appendChild(rect)
+                 });
+             } else {
+                 currentRect.remove();
+             }
+        }
         currentRect = null;
         console.log("Rect drawn");
     }

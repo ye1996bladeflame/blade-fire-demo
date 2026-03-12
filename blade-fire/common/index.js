@@ -99,16 +99,19 @@ export function enableZoom(svg) {
     // e.deltaY < 0 -> zoom in (factor < 1)
     const zoomFactor = 1 + e.deltaY * zoomSensitivity;
 
-    // New dimensions
+    // Constrain zoom factor
+    // Prevent zooming out too much or in too much if desired
+    
     const newW = viewBox.w * zoomFactor;
     const newH = viewBox.h * zoomFactor;
+    
+    // Zoom around mouse pointer
+    // Mouse position relative to viewBox
+    const mx = mouseX / rect.width * viewBox.w + viewBox.x;
+    const my = mouseY / rect.height * viewBox.h + viewBox.y;
 
-    // Calculate offset to keep mouse position stable
-    const dw = viewBox.w - newW;
-    const dh = viewBox.h - newH;
-
-    viewBox.x += (mouseX / rect.width) * dw;
-    viewBox.y += (mouseY / rect.height) * dh;
+    viewBox.x = mx - (mx - viewBox.x) * zoomFactor;
+    viewBox.y = my - (my - viewBox.y) * zoomFactor;
     viewBox.w = newW;
     viewBox.h = newH;
 
@@ -116,49 +119,45 @@ export function enableZoom(svg) {
     updateGridRect();
   });
 }
-// 自定义手势
+
 export function setCursor(svg, cursor) {
-  if (!svg) return;
-  
-  // 如果是自定义图片 URL
-  if (cursor.includes('.') || cursor.includes('data:image')) {
-    svg.style.cursor = `url(${cursor}), auto`;
-  } else {
-    // 原生光标样式 (如 'pointer', 'crosshair', 'move', 'default' 等)
     svg.style.cursor = cursor;
-  }
 }
 
-// 创建或获取覆盖层 (foreignObject)
 export function getOverlayLayer(svg) {
-    const svgNS = "http://www.w3.org/2000/svg";
-    let fo = svg.querySelector('#overlay-layer');
-    if (!fo) {
-        fo = document.createElementNS(svgNS, "foreignObject");
-        fo.setAttribute("id", "overlay-layer");
-        fo.setAttribute("width", "100%");
-        fo.setAttribute("height", "100%");
-        fo.setAttribute("style", "pointer-events: none; position: absolute; top: 0; left: 0; overflow: visible;");
-        
-        // Ensure it's on top of everything
-        svg.appendChild(fo);
-    } else {
-        // Move to top if not
-        if (svg.lastElementChild !== fo) {
-            svg.appendChild(fo);
-        }
-    }
-    
-    // Create container div inside if not exists
-    let container = fo.firstElementChild;
-    if (!container) {
-        container = document.createElement("div");
-        container.style.width = "100%";
-        container.style.height = "100%";
-        container.style.position = "relative";
-        container.style.pointerEvents = "none";
-        fo.appendChild(container);
-    }
-    
-    return container;
+    // This could return a dedicated group for overlays/tools if we had one
+    return svg; 
 }
+
+// History Manager
+export class History {
+    constructor() {
+        this.undoStack = [];
+        this.redoStack = [];
+    }
+
+    push(action) {
+        // action should have { undo: function, redo: function }
+        this.undoStack.push(action);
+        this.redoStack = []; // Clear redo stack
+        console.log("History push", action);
+    }
+
+    undo() {
+        if (this.undoStack.length === 0) return;
+        const action = this.undoStack.pop();
+        this.redoStack.push(action);
+        if (action.undo) action.undo();
+        console.log("Undo", action);
+    }
+
+    redo() {
+        if (this.redoStack.length === 0) return;
+        const action = this.redoStack.pop();
+        this.undoStack.push(action);
+        if (action.redo) action.redo();
+        console.log("Redo", action);
+    }
+}
+
+export const history = new History();
