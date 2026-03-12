@@ -128,3 +128,37 @@ export function setCursor(svg, cursor) {
     svg.style.cursor = cursor;
   }
 }
+
+// 创建或获取覆盖层 (foreignObject)
+export function getOverlayLayer(svg) {
+    const svgNS = "http://www.w3.org/2000/svg";
+    let fo = svg.querySelector('#overlay-layer');
+    if (!fo) {
+        fo = document.createElementNS(svgNS, "foreignObject");
+        fo.setAttribute("id", "overlay-layer");
+        fo.setAttribute("width", "100%");
+        fo.setAttribute("height", "100%");
+        fo.setAttribute("style", "pointer-events: none; position: absolute; top: 0; left: 0; overflow: visible;");
+        
+        // Ensure it's on top of everything
+        svg.appendChild(fo);
+    } else {
+        // Move to top if not
+        if (svg.lastElementChild !== fo) {
+            svg.appendChild(fo);
+        }
+    }
+    
+    // Create container div inside if not exists
+    let container = fo.firstElementChild;
+    if (!container) {
+        container = document.createElement("div");
+        container.style.width = "100%";
+        container.style.height = "100%";
+        container.style.position = "relative";
+        container.style.pointerEvents = "none";
+        fo.appendChild(container);
+    }
+    
+    return container;
+}

@@ -24,10 +24,10 @@ export function select(svg) {
     
     // Helper: Parse transform string to object
     function parseTransform(transformStr) {
-        const result = { tx: 0, ty: 0, rotate: 0, cx: 0, cy: 0 };
+        const result = { tx: 0, ty: 0, rotate: 0, cx: 0, cy: 0, sx: 1, sy: 1 };
         if (!transformStr) return result;
         
-        // Match translate
+        // Match translate (first one)
         const tMatch = transformStr.match(/translate\s*\(\s*([-\d.e]+)\s*[,\s]\s*([-\d.e]+)\s*\)/);
         if (tMatch) {
             result.tx = parseFloat(tMatch[1]);
@@ -40,6 +40,13 @@ export function select(svg) {
             result.rotate = parseFloat(rMatch[1]);
             if (rMatch[2] !== undefined) result.cx = parseFloat(rMatch[2]);
             if (rMatch[3] !== undefined) result.cy = parseFloat(rMatch[3]);
+        }
+        
+        // Match scale
+        const sMatch = transformStr.match(/scale\s*\(\s*([-\d.e]+)(?:\s*[,\s]\s*([-\d.e]+))?\s*\)/);
+        if (sMatch) {
+            result.sx = parseFloat(sMatch[1]);
+            result.sy = sMatch[2] !== undefined ? parseFloat(sMatch[2]) : result.sx;
         }
         
         return result;
@@ -83,33 +90,57 @@ export function select(svg) {
         return rect;
     }
 
-    // Helper: Get global bounding box of an element (transform applied)
     function getElementGlobalBounds(el) {
         try {
-            const bbox = el.getBBox();
-            const ctm = el.getCTM();
-            // Transform 4 corners
-            const pts = [
-                { x: bbox.x, y: bbox.y },
-                { x: bbox.x + bbox.width, y: bbox.y },
-                { x: bbox.x + bbox.width, y: bbox.y + bbox.height },
-                { x: bbox.x, y: bbox.y + bbox.height }
-            ];
-            
-            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-            pts.forEach(p => {
-                const x = ctm.a * p.x + ctm.c * p.y + ctm.e;
-                const y = ctm.b * p.x + ctm.d * p.y + ctm.f;
-                minX = Math.min(minX, x);
-                minY = Math.min(minY, y);
-                maxX = Math.max(maxX, x);
-                maxY = Math.max(maxY, y);
-            });
-            
-            return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+            const rect = el.getBoundingClientRect();
+            const svgRect = svg.getBoundingClientRect();
+            const ctm = svg.getScreenCTM().inverse();
+
+            const p1 = new DOMPoint(rect.left, rect.top);
+            const p2 = new DOMPoint(rect.right, rect.bottom);
+
+            const start = p1.matrixTransform(ctm);
+            const end = p2.matrixTransform(ctm);
+
+            return {
+                x: start.x,
+                y: start.y,
+                width: end.x - start.x,
+                height: end.y - start.y
+            };
         } catch (e) {
+            console.error("Failed to get element bounds:", e);
             return { x: 0, y: 0, width: 0, height: 0 };
         }
+    }
+
+    // Helper: Calculate visual cursor based on handle position and rotation
+    function getCursorForHandle(handleType, rotation) {
+        if (!handleType || handleType === 'rotate') return 'grab';
+        
+        // Map handle type to angle
+        const angleMap = {
+            'n': 0, 'ne': 45, 'e': 90, 'se': 135,
+            's': 180, 'sw': 225, 'w': 270, 'nw': 315
+        };
+        
+        let angle = angleMap[handleType];
+        if (angle === undefined) return 'default';
+        
+        // Add object rotation
+        angle = (angle + rotation) % 360;
+        if (angle < 0) angle += 360;
+        
+        // Snap to nearest 45 degree
+        const snapped = Math.round(angle / 45) * 45 % 360;
+        
+        // Map back to cursor name
+        const cursorMap = {
+            0: 'n-resize', 45: 'ne-resize', 90: 'e-resize', 135: 'se-resize',
+            180: 's-resize', 225: 'sw-resize', 270: 'w-resize', 315: 'nw-resize'
+        };
+        
+        return cursorMap[snapped] || 'default';
     }
 
     // Create/Update transform handles
@@ -124,6 +155,7 @@ export function select(svg) {
         transformGroup = document.createElementNS(SVG_NS, "g");
         
         let bbox;
+        let rotation = 0;
         
         if (selectedElements.length === 1) {
             // Single selection: Use local BBox and apply element's transform to handles
@@ -133,6 +165,8 @@ export function select(svg) {
                 const transform = el.getAttribute("transform");
                 if (transform) {
                     transformGroup.setAttribute("transform", transform);
+                    const tData = parseTransform(transform);
+                    rotation = tData.rotate;
                 }
             } catch (e) {
                 bbox = { x: 0, y: 0, width: 0, height: 0 };
@@ -165,15 +199,15 @@ export function select(svg) {
         // Resize Handles
         const handleSize = 8;
         const positions = [
-            { x: bbox.x, y: bbox.y, cursor: "nw-resize", type: "nw" },
-            { x: bbox.x + bbox.width, y: bbox.y, cursor: "ne-resize", type: "ne" },
-            { x: bbox.x + bbox.width, y: bbox.y + bbox.height, cursor: "se-resize", type: "se" },
-            { x: bbox.x, y: bbox.y + bbox.height, cursor: "sw-resize", type: "sw" },
+            { x: bbox.x, y: bbox.y, type: "nw" },
+            { x: bbox.x + bbox.width, y: bbox.y, type: "ne" },
+            { x: bbox.x + bbox.width, y: bbox.y + bbox.height, type: "se" },
+            { x: bbox.x, y: bbox.y + bbox.height, type: "sw" },
             // Middle handles
-            { x: bbox.x + bbox.width / 2, y: bbox.y, cursor: "n-resize", type: "n" },
-            { x: bbox.x + bbox.width, y: bbox.y + bbox.height / 2, cursor: "e-resize", type: "e" },
-            { x: bbox.x + bbox.width / 2, y: bbox.y + bbox.height, cursor: "s-resize", type: "s" },
-            { x: bbox.x, y: bbox.y + bbox.height / 2, cursor: "w-resize", type: "w" }
+            { x: bbox.x + bbox.width / 2, y: bbox.y, type: "n" },
+            { x: bbox.x + bbox.width, y: bbox.y + bbox.height / 2, type: "e" },
+            { x: bbox.x + bbox.width / 2, y: bbox.y + bbox.height, type: "s" },
+            { x: bbox.x, y: bbox.y + bbox.height / 2, type: "w" }
         ];
 
         positions.forEach(pos => {
@@ -185,7 +219,10 @@ export function select(svg) {
             handle.setAttribute("fill", "white");
             handle.setAttribute("stroke", "#1890ff");
             handle.setAttribute("stroke-width", 1);
-            handle.style.cursor = pos.cursor;
+            
+            // Calculate correct cursor based on rotation
+            const cursor = getCursorForHandle(pos.type, rotation);
+            handle.style.cursor = cursor;
             handle.dataset.type = pos.type;
             transformGroup.appendChild(handle);
         });
@@ -228,6 +265,24 @@ export function select(svg) {
             const transform = el.getAttribute("transform") || "";
             const tData = parseTransform(transform);
             
+            // For path/polygon, width/height/x/y might not exist as attributes
+            let initW = 0, initH = 0, initX = 0, initY = 0;
+            const bbox = el.getBBox();
+            
+            if (el.tagName === 'rect' || el.tagName === 'image') {
+                initW = parseFloat(el.getAttribute("width"));
+                initH = parseFloat(el.getAttribute("height"));
+                initX = parseFloat(el.getAttribute("x"));
+                initY = parseFloat(el.getAttribute("y"));
+            } else {
+                // For path, etc., calculate Visual Width/Height based on current scale
+                // tData.sx/sy are parsed from the transform string.
+                initW = bbox.width * tData.sx;
+                initH = bbox.height * tData.sy;
+                initX = bbox.x;
+                initY = bbox.y;
+            }
+
             elementStates = [{
                 el,
                 initTx: tData.tx,
@@ -235,12 +290,15 @@ export function select(svg) {
                 initRot: tData.rotate,
                 initCx: tData.cx,
                 initCy: tData.cy,
-                bbox: el.getBBox(),
-                initWidth: parseFloat(el.getAttribute("width")),
-                initHeight: parseFloat(el.getAttribute("height")),
-                initX: parseFloat(el.getAttribute("x")),
-                initY: parseFloat(el.getAttribute("y")),
-                initTransform: transform
+                initSx: tData.sx,
+                initSy: tData.sy,
+                bbox: bbox,
+                initWidth: initW,
+                initHeight: initH,
+                initX: initX,
+                initY: initY,
+                initTransform: transform,
+                tagName: el.tagName
             }];
         } else {
             // Multi-selection state
@@ -297,32 +355,30 @@ export function select(svg) {
                 isDragging = false;
                 return;
             }
-            
             dragMode = 'move';
-            setCursor(svg, "move");
             captureState(pos);
+            evt.stopPropagation();
             return;
         }
 
-        // 3. Check Unselected Element Click
-        if (target !== svg && target.getAttribute('data-is-grid') !== 'true' && !target.classList.contains('grid-rect') && target.parentNode === svg) {
-            if (evt.shiftKey || evt.ctrlKey) {
-                selectedElements.push(target);
-            } else {
-                selectedElements = [target];
-            }
-            updateTransformHandles();
-            
-            dragMode = 'move';
-            setCursor(svg, "move");
-            captureState(pos);
-            return;
-        }
-
-        // 4. Background Click -> Box Select
+        // 3. New Selection
         if (!evt.shiftKey && !evt.ctrlKey) {
             clearSelection();
         }
+        
+        // Check if clicked on a new selectable element
+        if (target !== svg && target.tagName !== 'defs' && target.getAttribute('data-is-grid') !== 'true' && !target.classList.contains('grid-rect')) {
+             if (!selectedElements.includes(target)) {
+                 selectedElements.push(target);
+                 updateTransformHandles();
+                 dragMode = 'move';
+                 captureState(pos);
+                 evt.stopPropagation();
+                 return;
+             }
+        }
+
+        // 4. Start Rubber Band
         dragMode = 'select';
         selectionRect = createSelectionRect(pos.x, pos.y);
     }
@@ -344,22 +400,23 @@ export function select(svg) {
             selectionRect.setAttribute("height", h);
         }
         else if (dragMode === 'move') {
+            setCursor(svg, "move");
             if (selectedElements.length === 1) {
                 const s = elementStates[0];
                 const newTx = s.initTx + dx;
                 const newTy = s.initTy + dy;
-                // Keep original rotation center if it was set, or default to center
-                let cx = s.initCx;
-                let cy = s.initCy;
-                if (!s.initRot) {
-                    cx = s.bbox.x + s.bbox.width/2;
-                    cy = s.bbox.y + s.bbox.height/2;
-                }
                 
+                // Construct new transform
+                // We use standard order: translate -> rotate -> scale
                 let tStr = `translate(${newTx}, ${newTy})`;
                 if (s.initRot) {
-                    tStr += ` rotate(${s.initRot}, ${cx}, ${cy})`;
+                    tStr += ` rotate(${s.initRot}, ${s.initCx || 0}, ${s.initCy || 0})`;
                 }
+                // Maintain scale if it existed
+                if (s.initSx !== 1 || s.initSy !== 1) {
+                    tStr += ` scale(${s.initSx}, ${s.initSy})`;
+                }
+                
                 s.el.setAttribute("transform", tStr);
                 transformGroup.setAttribute("transform", tStr);
             } else {
@@ -374,19 +431,33 @@ export function select(svg) {
         else if (dragMode === 'rotate') {
             if (selectedElements.length === 1) {
                 const s = elementStates[0];
-                // Local rotation center
-                const cx = s.bbox.x + s.bbox.width/2;
-                const cy = s.bbox.y + s.bbox.height/2;
+                const cx = s.initCx || (s.bbox.x + s.bbox.width/2);
+                const cy = s.initCy || (s.bbox.y + s.bbox.height/2);
                 
                 // Calculate angle relative to center
                 // Center in screen space is (cx + tx, cy + ty)
-                const centerX = cx + s.initTx;
-                const centerY = cy + s.initTy;
+                // Note: If scale is present, center is affected?
+                // The cx/cy from parseTransform are in un-rotated space.
+                // If scaled, the center logic might need adjustment? 
+                // Currently ignoring scale impact on rotation center for simplicity, assuming center of bbox.
                 
-                const angle = Math.atan2(pos.y - centerY, pos.x - centerX) * 180 / Math.PI + 90;
+                const centerX = cx * s.initSx + s.initTx; // Adjusted for scale
+                const centerY = cy * s.initSy + s.initTy;
+                
+                // Actually, if we use the visual center of the bbox:
+                const visualCx = (s.bbox.x + s.bbox.width/2) * s.initSx + s.initTx;
+                const visualCy = (s.bbox.y + s.bbox.height/2) * s.initSy + s.initTy;
+                
+                const angle = Math.atan2(pos.y - visualCy, pos.x - visualCx) * 180 / Math.PI + 90;
                 
                 // Update transform
-                const tStr = `translate(${s.initTx}, ${s.initTy}) rotate(${angle}, ${cx}, ${cy})`;
+                let tStr = `translate(${s.initTx}, ${s.initTy}) rotate(${angle}, ${(s.bbox.x + s.bbox.width/2) * s.initSx}, ${(s.bbox.y + s.bbox.height/2) * s.initSy})`;
+                if (s.initSx !== 1 || s.initSy !== 1) {
+                    // For rotation center to be correct with scale, it's easiest to rotate around scaled center
+                    // We updated the rotate center args above.
+                    tStr += ` scale(${s.initSx}, ${s.initSy})`;
+                }
+                
                 s.el.setAttribute("transform", tStr);
                 transformGroup.setAttribute("transform", tStr);
             } else {
@@ -406,7 +477,7 @@ export function select(svg) {
             if (selectedElements.length === 1) {
                 const s = elementStates[0];
                 
-                // 1. Calculate local delta
+                // 1. Calculate local delta (rotated to align with element axes)
                 let ldx = dx;
                 let ldy = dy;
                 if (s.initRot) {
@@ -417,25 +488,18 @@ export function select(svg) {
                     ldy = dx * sin + dy * cos;
                 }
                 
-                if (s.el.tagName === 'rect') {
-                    // 2. Identify anchor point (opposite corner) in local space
+                if (s.tagName === 'rect' || s.tagName === 'image') {
+                    // Existing Rect Logic (omitted for brevity, unchanged)
                     let anchorX = s.initX;
                     let anchorY = s.initY;
-                    // If resizing 'nw', anchor is 'se' (x+w, y+h)
-                    // If resizing 'ne', anchor is 'sw' (x, y+h)
-                    // etc.
                     
                     if (resizeHandle.includes('w')) anchorX = s.initX + s.initWidth;
                     if (resizeHandle.includes('n')) anchorY = s.initY + s.initHeight;
-                    // If resizing 'se', anchor is 'nw' (x, y). Default.
                     
-                    // 3. Calculate Global Anchor Position (using initial transform)
-                    // P_global = T(initTx, initTy) * R(initRot, initCx, initCy) * P_local_anchor
                     const globalAnchor = rotatePoint(anchorX, anchorY, s.initCx || (s.bbox.x + s.bbox.width/2), s.initCy || (s.bbox.y + s.bbox.height/2), s.initRot);
                     globalAnchor.x += s.initTx;
                     globalAnchor.y += s.initTy;
                     
-                    // 4. Update local dimensions
                     let newW = s.initWidth;
                     let newH = s.initHeight;
                     let newX = s.initX;
@@ -449,22 +513,14 @@ export function select(svg) {
                     if (newW < 1) newW = 1;
                     if (newH < 1) newH = 1;
                     
-                    // 5. Calculate new local center
                     const newCX = newX + newW / 2;
                     const newCY = newY + newH / 2;
-                    
-                    // 6. Calculate where the anchor would be with the NEW center but OLD translate
-                    // We need to find newTx, newTy such that:
-                    // globalAnchor = T(newTx, newTy) * R(initRot, newCX, newCY) * P_local_anchor
-                    // Note: P_local_anchor coordinates in the new rect are the SAME values as before 
-                    // (e.g. if we resized Left, the Right edge is still at X+W = initX+initW)
                     
                     const rotatedAnchor = rotatePoint(anchorX, anchorY, newCX, newCY, s.initRot);
                     
                     const newTx = globalAnchor.x - rotatedAnchor.x;
                     const newTy = globalAnchor.y - rotatedAnchor.y;
                     
-                    // 7. Apply updates
                     s.el.setAttribute('x', newX);
                     s.el.setAttribute('y', newY);
                     s.el.setAttribute('width', newW);
@@ -474,12 +530,88 @@ export function select(svg) {
                     s.el.setAttribute("transform", tStr);
                     transformGroup.setAttribute("transform", tStr);
                     
-                    // Crucial for smooth interaction: update handles to match new geometry
+                    updateTransformHandles();
+                } else {
+                    // Path/Polygon Resize Logic using Scale
+                    
+                    // 1. Calculate new Visual Width/Height
+                    // s.initWidth is the visual width at start of drag (includes previous scale)
+                    let newVisualW = s.initWidth;
+                    let newVisualH = s.initHeight;
+                    
+                    if (resizeHandle.includes('e')) newVisualW += ldx;
+                    if (resizeHandle.includes('s')) newVisualH += ldy;
+                    if (resizeHandle.includes('w')) newVisualW -= ldx;
+                    if (resizeHandle.includes('n')) newVisualH -= ldy;
+                    
+                    // Avoid zero/negative size
+                    if (newVisualW < 1) newVisualW = 1;
+                    if (newVisualH < 1) newVisualH = 1;
+                    
+                    // 2. Calculate New Scale Factors
+                    // Scale relative to the original local bbox
+                    const sx = newVisualW / s.bbox.width;
+                    const sy = newVisualH / s.bbox.height;
+                    
+                    // 3. Anchor Logic to calculate new Translation
+                    // We need to keep the Anchor Point fixed in Global Space.
+                    
+                    // Determine Anchor Point in "Scaled Local Space" (Visual Space before Rotation)
+                    // If resizing West, Anchor is East.
+                    let anchorLocalX_scaled = s.initX * s.initSx; // Start with old visual pos
+                    let anchorLocalY_scaled = s.initY * s.initSy;
+                    
+                    if (resizeHandle.includes('w')) anchorLocalX_scaled = (s.initX + s.bbox.width) * s.initSx; // East edge (old visual)
+                    if (resizeHandle.includes('n')) anchorLocalY_scaled = (s.initY + s.bbox.height) * s.initSy; // South edge (old visual)
+                    
+                    // Global Anchor Position (Fixed)
+                    // Apply Rotate + Translate to the scaled anchor
+                    // Center of rotation for the object is the visual center
+                    const oldVisualCx = (s.bbox.x + s.bbox.width/2) * s.initSx;
+                    const oldVisualCy = (s.bbox.y + s.bbox.height/2) * s.initSy;
+                    
+                    const globalAnchor = rotatePoint(anchorLocalX_scaled, anchorLocalY_scaled, oldVisualCx, oldVisualCy, s.initRot);
+                    globalAnchor.x += s.initTx;
+                    globalAnchor.y += s.initTy;
+                    
+                    // New Local Anchor Position (after NEW scale)
+                    // If resizing West, Anchor is East. East edge corresponds to (bbox.x + bbox.width).
+                    // So in new scaled space, it is at (bbox.x + bbox.width) * sx.
+                    let newAnchorX_scaled = s.initX * sx;
+                    let newAnchorY_scaled = s.initY * sy;
+                    
+                    if (resizeHandle.includes('w')) newAnchorX_scaled = (s.initX + s.bbox.width) * sx;
+                    if (resizeHandle.includes('n')) newAnchorY_scaled = (s.initY + s.bbox.height) * sy;
+                    
+                    // New Center of rotation (Visual Center with new scale)
+                    const newVisualCx = (s.bbox.x + s.bbox.width/2) * sx;
+                    const newVisualCy = (s.bbox.y + s.bbox.height/2) * sy;
+                    
+                    // Calculate where this new anchor would be if we just rotated (without new translation)
+                    const rotatedNewAnchor = rotatePoint(newAnchorX_scaled, newAnchorY_scaled, newVisualCx, newVisualCy, s.initRot);
+                    
+                    // The difference is the new Translation needed
+                    const newTx = globalAnchor.x - rotatedNewAnchor.x;
+                    const newTy = globalAnchor.y - rotatedNewAnchor.y;
+                    
+                    // Construct final transform
+                    // translate(newTx, newTy) rotate(angle, newVisualCx, newVisualCy) scale(sx, sy)
+                    // Note: SVG rotate(a, cx, cy) is around (cx, cy) in the user space *before* rotation.
+                    // Since we apply scale *after* rotate in string order (right-to-left application? NO).
+                    // SVG transform="translate T rotate R scale S" means T * R * S * point.
+                    // So Scale is applied first.
+                    // Then Rotate is applied. The center (cx, cy) for rotate must be in the SCALED space.
+                    // Yes, newVisualCx/Cy are in scaled space.
+                    
+                    const tStr = `translate(${newTx}, ${newTy}) rotate(${s.initRot}, ${newVisualCx}, ${newVisualCy}) scale(${sx}, ${sy})`;
+                    
+                    s.el.setAttribute("transform", tStr);
+                    
+                    transformGroup.setAttribute("transform", tStr);
                     updateTransformHandles();
                 }
             } else {
-                // Multi Element Resize
-                // Calculate scale factors based on group bounds
+                // Multi Element Resize (unchanged)
                 const currentW = groupBounds.width;
                 const currentH = groupBounds.height;
                 
@@ -499,21 +631,14 @@ export function select(svg) {
                 const sx = newW / currentW;
                 const sy = newH / currentH;
                 
-                // Calculate translation to map old position to new position
-                // newX = oldX * sx + tx -> tx = newX - oldX * sx
                 const tx = newX - groupBounds.x * sx;
                 const ty = newY - groupBounds.y * sy;
                 
-                // Apply transform: T(tx, ty) * S(sx, sy)
                 selectedElements.forEach((el, i) => {
                     const s = elementStates[i];
-                    // Prepend the new transform to the initial transform
                     el.setAttribute("transform", `translate(${tx}, ${ty}) scale(${sx}, ${sy}) ${s.initTransform}`);
                 });
                 
-                // Update handles by redrawing at new bounds?
-                // Or just transforming the group?
-                // Transforming group is faster.
                 transformGroup.setAttribute("transform", `translate(${tx}, ${ty}) scale(${sx}, ${sy})`);
             }
         }
@@ -537,7 +662,7 @@ export function select(svg) {
             
             const children = Array.from(svg.children);
             for (let el of children) {
-                if (el.tagName === 'defs' || el.tagName === 'g' || el.getAttribute('data-is-grid') === 'true' || el.classList.contains('grid-rect')) continue;
+                if (el.tagName === 'defs' || el.tagName === 'g' || el.id === 'grid-background' || el.getAttribute('data-is-grid') === 'true') continue;
                 
                 try {
                     const bbox = getElementGlobalBounds(el);
@@ -569,6 +694,7 @@ export function select(svg) {
         svg.removeEventListener("mousedown", onMouseDown);
         window.removeEventListener("mousemove", onMouseMove);
         window.removeEventListener("mouseup", onMouseUp);
-        clearSelection();
+        if (transformGroup && transformGroup.parentNode) transformGroup.parentNode.removeChild(transformGroup);
+        if (selectionRect && selectionRect.parentNode) selectionRect.parentNode.removeChild(selectionRect);
     };
 }
