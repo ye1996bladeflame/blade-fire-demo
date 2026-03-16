@@ -4,6 +4,7 @@ export class History {
     this.redoStack = [];
     this.listeners = [];
     this.id = Math.random();
+    this.isLocked = false;
     console.log("History created with ID:", this.id);
   }
 
@@ -26,6 +27,10 @@ export class History {
   }
 
   undo() {
+    if (this.isLocked) return;
+    this.isLocked = true;
+    setTimeout(() => { this.isLocked = false; }, 50);
+
     if (this.undoStack.length === 0) return;
     const action = this.undoStack.pop();
     this.redoStack.push(action);
@@ -35,6 +40,10 @@ export class History {
   }
 
   redo() {
+    if (this.isLocked) return;
+    this.isLocked = true;
+    setTimeout(() => { this.isLocked = false; }, 50);
+
     if (this.redoStack.length === 0) return;
     const action = this.redoStack.pop();
     this.undoStack.push(action);

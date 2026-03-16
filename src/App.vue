@@ -65,6 +65,7 @@ const historyLog = ref([])
 let activeToolCleanup = null
 let selectionCleanup = null
 let historyCleanup = null
+let bladeFireCleanup = null
 
 const selectTool = (tool) => {
   // If clicking the same tool, do nothing or toggle? 
@@ -86,7 +87,10 @@ const selectTool = (tool) => {
 }
 
 onMounted(() => {
-  BladeFire.init({ container: 'map-container', grid: true, gridSize: 40, zoom: true })
+  const instance = BladeFire.init({ container: 'map-container', grid: true, gridSize: 40, zoom: true })
+  if (instance && instance.destroy) {
+    bladeFireCleanup = instance.destroy
+  }
 
   selectionCleanup = BladeFire.onSelectionChange((info) => {
     selectionInfo.value = info
@@ -100,6 +104,7 @@ onMounted(() => {
 onUnmounted(() => {
   if (selectionCleanup) selectionCleanup()
   if (historyCleanup) historyCleanup()
+  if (bladeFireCleanup) bladeFireCleanup()
 })
 </script>
 

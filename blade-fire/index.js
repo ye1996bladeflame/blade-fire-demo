@@ -57,12 +57,13 @@ class BladeFire {
             enableDrag(svg);
 
             let lastMousePos = { x: 0, y: 0 };
-            window.addEventListener("mousemove", (evt) => {
+            const onMouseMove = (evt) => {
                 lastMousePos = getMousePosition(svg, evt);
-            });
+            };
+            window.addEventListener("mousemove", onMouseMove);
 
 
-            window.addEventListener("keydown", (e) => {
+            const onKeyDown = (e) => {
 
                 if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
 
@@ -136,12 +137,20 @@ class BladeFire {
 
                     e.preventDefault();
                 }
-            });
+            };
+            window.addEventListener("keydown", onKeyDown);
 
 
             this.svg = svg;
 
-            return svg;
+            return {
+                svg,
+                destroy: () => {
+                    window.removeEventListener("mousemove", onMouseMove);
+                    window.removeEventListener("keydown", onKeyDown);
+                    // Also clean up features if needed
+                }
+            };
         }
     }
     static toggleRuler(enable) {
