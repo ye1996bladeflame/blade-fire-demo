@@ -98,8 +98,8 @@ export function polygon(svg) {
                 }
             });
 
-            const transform = path.getAttribute('transform');
-            const matrix = new DOMMatrix(transform || '');
+            const matrix = path.getCTM();
+            if (!matrix) continue;
 
             for (const p of points) {
                 const transformedP = new DOMPoint(p.x, p.y).matrixTransform(matrix);
