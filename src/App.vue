@@ -20,35 +20,37 @@
       <div id="map-container"></div>
     </a-layout-content>
     <a-layout-sider theme="light" width="300" class="right-sider">
-      <div class="properties-panel">
-        <div class="panel-title">属性</div>
-        <div class="panel-content">
-          <div v-if="selectionInfo.length === 0" class="empty-state">未选中任何图形</div>
+      <div class="right-panel-content">
+        <a-card title="属性" size="small" :bordered="false">
+          <a-empty v-if="selectionInfo.length === 0" description="未选中任何图形" :image="undefined" />
           <div v-else>
-            <div v-for="(item, idx) in selectionInfo" :key="idx" class="prop-item">
-              <div class="prop-header">{{ item.tagName }}</div>
-              <div class="prop-row">
-                <span class="label">宽度:</span>
-                <span class="value">{{ Math.round(item.width) }}</span>
-              </div>
-              <div class="prop-row">
-                <span class="label">高度:</span>
-                <span class="value">{{ Math.round(item.height) }}</span>
-              </div>
-            </div>
+            <a-descriptions v-for="(item, idx) in selectionInfo" :key="idx" :title="item.tagName" size="small" :column="1" bordered style="margin-bottom: 16px">
+              <a-descriptions-item label="宽度">{{ Math.round(item.width) }}</a-descriptions-item>
+              <a-descriptions-item label="高度">{{ Math.round(item.height) }}</a-descriptions-item>
+            </a-descriptions>
           </div>
-        </div>
+        </a-card>
 
-        <div class="panel-title history-title">历史消息</div>
-        <div class="panel-content history-container">
-          <div v-if="historyLog.length === 0" class="empty-state">暂无历史记录</div>
+        <a-divider style="margin: 12px 0" />
+
+        <a-card title="历史消息" size="small" :bordered="false" class="history-card" :bodyStyle="{ flex: 1, overflowY: 'auto', minHeight: 0 }">
+          <a-empty v-if="historyLog.length === 0" description="暂无历史记录" :image="undefined" />
           <div v-else class="history-list">
-            <div v-for="(item, index) in historyLog" :key="index" class="history-item">
-              <span class="index">{{ index + 1 }}.</span>
-              <span class="desc">{{ item.desc || '未知操作' }}</span>
-            </div>
+            <a-card 
+              v-for="(item, index) in historyLog" 
+              :key="index" 
+              size="small" 
+              class="history-item-card" 
+              :bordered="false"
+              :bodyStyle="{ padding: '8px 12px' }"
+            >
+              <div class="history-content">
+                <span class="history-index">#{{ index + 1 }}</span>
+                <span class="history-desc">{{ item.desc || '未知操作' }}</span>
+              </div>
+            </a-card>
           </div>
-        </div>
+        </a-card>
       </div>
     </a-layout-sider>
   </a-layout>
@@ -146,68 +148,25 @@ onUnmounted(() => {
   gap: 12px;
 }
 
-.toolbar-title,
-.panel-title {
+.toolbar-title {
   font-weight: bold;
   margin-bottom: 10px;
   font-size: 16px;
   color: #333;
 }
 
-.properties-panel {
-  padding: 16px;
+.right-panel-content {
   height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  background-color: #fff;
 }
 
-.empty-state {
-  color: #999;
-  font-size: 14px;
-  text-align: center;
-  padding: 20px 0;
-}
-
-.prop-item {
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  padding: 12px;
-  margin-bottom: 12px;
-  background-color: #fafafa;
-}
-
-.prop-header {
-  font-weight: bold;
-  margin-bottom: 8px;
-  text-transform: capitalize;
-  border-bottom: 1px solid #eee;
-  padding-bottom: 4px;
-}
-
-.prop-row {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 4px;
-  font-size: 14px;
-}
-
-.label {
-  color: #666;
-}
-
-.value {
-  font-family: monospace;
-}
-
-.history-title {
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid #f0f0f0;
-}
-
-.history-container {
+.history-card {
   flex: 1;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
 }
 
@@ -215,23 +174,34 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding-bottom: 8px;
 }
 
-.history-item {
-  display: flex;
-  gap: 8px;
-  padding: 8px;
-  background-color: #f9f9f9;
+.history-item-card {
+  background: #f5f5f5;
   border-radius: 4px;
   font-size: 13px;
+  transition: all 0.3s;
 }
 
-.index {
+.history-item-card:hover {
+  background: #e6f7ff;
+}
+
+.history-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.history-index {
   color: #999;
-  min-width: 20px;
+  font-family: monospace;
+  min-width: 24px;
 }
 
-.desc {
+.history-desc {
+  font-weight: 500;
   color: #333;
 }
 </style>
