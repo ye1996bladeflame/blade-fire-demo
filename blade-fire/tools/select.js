@@ -928,8 +928,10 @@ export function select(svg) {
             if (selectedElements.length === 0) return;
 
             const elementsToRemove = [...selectedElements];
-            const parents = elementsToRemove.map(el => el.parentNode);
-            const nextSiblings = elementsToRemove.map(el => el.nextSibling);
+            const parentsInfo = elementsToRemove.map(el => ({
+                parent: el.parentNode,
+                nextSibling: el.nextSibling
+            }));
 
             elementsToRemove.forEach(el => {
                 if (el.parentNode) el.parentNode.removeChild(el);
@@ -938,8 +940,9 @@ export function select(svg) {
             history.push({
                 undo: () => {
                     elementsToRemove.forEach((el, i) => {
-                        if (parents[i]) {
-                            parents[i].insertBefore(el, nextSiblings[i]);
+                        const info = parentsInfo[i];
+                        if (info.parent) {
+                            info.parent.insertBefore(el, info.nextSibling);
                         } else {
                             svg.appendChild(el);
                         }

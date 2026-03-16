@@ -19,49 +19,6 @@ export function polygon(svg) {
     let viewChangeObserver = null;
     let lastMouseMoveEvent = null;
 
-    function restoreDrawingState(savedPoints, path) {
-        points = savedPoints;
-        activePath = path;
-
-        
-        toolGroup = createSVGElement("g", { "pointer-events": "none" });
-        svg.appendChild(toolGroup);
-
-        const startPoint = points[0];
-        startPointMarker = createSVGElement("circle", {
-            "cx": startPoint.x,
-            "cy": startPoint.y,
-            "r": 5,
-            "fill": "rgba(0, 255, 0, 0.5)",
-            "stroke": "green",
-            "pointer-events": "all",
-            "cursor": "pointer"
-        });
-        svg.appendChild(startPointMarker); 
-
-        const lastPoint = points[points.length - 1];
-        guideLine = createSVGElement("line", {
-            "x1": lastPoint.x,
-            "y1": lastPoint.y,
-            "x2": lastPoint.x,
-            "y2": lastPoint.y,
-            "stroke": "green",
-            "stroke-width": "1",
-            "stroke-dasharray": "5,5"
-        });
-        toolGroup.appendChild(guideLine);
-
-        
-        if (viewChangeObserver) viewChangeObserver.disconnect();
-        viewChangeObserver = new MutationObserver(() => {
-            if (snapIndicator) {
-                snapIndicator.setAttribute("r", 5 / (svg.getScreenCTM().a || 1));
-                snapIndicator.setAttribute("stroke-width", 2 / (svg.getScreenCTM().a || 1));
-            }
-        });
-        viewChangeObserver.observe(svg, { attributes: true, attributeFilter: ['viewBox', 'width', 'height'] });
-    }
-
     
     function findSnapPoint(mousePos, snapRadius = 10) {
         const allPaths = Array.from(svg.querySelectorAll('path'));
@@ -183,36 +140,16 @@ export function polygon(svg) {
         
         history.push({
             undo: () => {
-                if (isToolActive) {
-                    
-                    activePath = path;
-                    
-                    
-                    restoreDrawingState(savedPoints, path);
-                    
-                    
-                    let d = path.getAttribute("d");
-                    if (d.match(/Z\s*$/i)) {
-                         d = d.replace(/\s*Z\s*$/i, "");
-                         path.setAttribute("d", d);
-                    }
-                    path.setAttribute("fill", "none");
-                } else {
+                if (path && path.parentNode) {
                     path.remove();
                 }
             },
             redo: () => {
-                if (isToolActive) {
-                     
-                     let d = path.getAttribute("d");
-                     if (!d.match(/Z\s*$/i)) d += " Z";
-                     path.setAttribute("d", d);
-                     path.setAttribute("fill", "transparent");
-                     
-                     resetState(false);
-                } else {
-                     svg.appendChild(path);
-                }
+                let d = path.getAttribute("d");
+                if (!d.match(/Z\s*$/i)) d += " Z";
+                path.setAttribute("d", d);
+                path.setAttribute("fill", "transparent");
+                svg.appendChild(path);
             }
         });
 
