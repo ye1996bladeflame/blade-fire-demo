@@ -75,6 +75,7 @@ function onMouseUp(evt) {
              if (bbox.width > 0 && bbox.height > 0) {
                  const triangle = currentTriangle;
                  history.push({
+                     desc: 'Create Triangle',
                      undo: () => triangle.remove(),
                      redo: () => svgElement.appendChild(triangle)
                  });

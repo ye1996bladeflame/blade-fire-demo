@@ -74,6 +74,7 @@ function startEditing(textNode, isNew = false) {
             if (isNewText) {
                 
                 history.push({
+                    desc: 'Create Text',
                     undo: () => textNodeRef.remove(),
                     redo: () => svgElement.appendChild(textNodeRef)
                 });
@@ -82,6 +83,7 @@ function startEditing(textNode, isNew = false) {
                 const oldContent = initialContent;
                 const newContent = newValue;
                 history.push({
+                    desc: 'Edit Text',
                     undo: () => { textNodeRef.textContent = oldContent; },
                     redo: () => { textNodeRef.textContent = newContent; }
                 });
@@ -97,6 +99,7 @@ function startEditing(textNode, isNew = false) {
                  
                  
                  history.push({
+                     desc: 'Delete Text',
                      undo: () => { 
                          textNodeRef.textContent = oldContent;
                          textNodeRef.style.visibility = "visible";

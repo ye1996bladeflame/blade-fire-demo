@@ -68,6 +68,7 @@ function onMouseUp(evt) {
              if (rx > 0 && ry > 0) {
                  const circle = currentCircle;
                  history.push({
+                     desc: 'Create Circle',
                      undo: () => circle.remove(),
                      redo: () => svgElement.appendChild(circle)
                  });

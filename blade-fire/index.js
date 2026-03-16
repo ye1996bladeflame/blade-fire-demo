@@ -11,6 +11,19 @@ import { createCrosshair } from "./features/crosshair.js";
 
 class BladeFire {
     version = "1.0.0";
+    static selectionListeners = [];
+
+    static onSelectionChange(callback) {
+        this.selectionListeners.push(callback);
+        return () => {
+            this.selectionListeners = this.selectionListeners.filter(cb => cb !== callback);
+        };
+    }
+
+    static notifySelectionChange(elements) {
+        this.selectionListeners.forEach(cb => cb(elements));
+    }
+
     static init(config) {
         const container = document.getElementById(config.container);
         if (container) {
@@ -110,6 +123,7 @@ class BladeFire {
 
                     // Add to history
                     history.push({
+                        desc: 'Paste elements',
                         undo: () => {
                             newElements.forEach(el => {
                                 if (el.parentNode) el.parentNode.removeChild(el);
@@ -156,7 +170,7 @@ class BladeFire {
         return text(this.svg);
     }
     static select() {
-        return select(this.svg);
+        return select(this.svg, (elements) => this.notifySelectionChange(elements));
     }
 }
 

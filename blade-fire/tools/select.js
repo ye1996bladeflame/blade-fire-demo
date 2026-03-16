@@ -2,7 +2,7 @@ import { setCursor, history, setClipboard, getClipboard, parseTransform, getMous
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
 
-export function select(svg) {
+export function select(svg, onSelectionChangeCallback) {
   console.log('Select tool activated')
   setCursor(svg, 'default')
 
@@ -22,6 +22,23 @@ export function select(svg) {
   let elementStates = []
   let groupBounds = null
   let resizeHandle = null
+
+  function notifySelectionChange() {
+    if (onSelectionChangeCallback) {
+      const selectionInfo = selectedElements.map(el => {
+        const bounds = getElementGlobalBounds(el);
+        return {
+          id: el.id,
+          tagName: el.tagName,
+          x: bounds.x,
+          y: bounds.y,
+          width: bounds.width,
+          height: bounds.height
+        };
+      });
+      onSelectionChangeCallback(selectionInfo);
+    }
+  }
 
   function rotatePoint(x, y, cx, cy, angle) {
     const rad = (angle * Math.PI) / 180
@@ -214,10 +231,14 @@ export function select(svg) {
       transformGroup = null
     }
 
-    if (selectedElements.length === 0) return
+    if (selectedElements.length === 0) {
+      notifySelectionChange()
+      return
+    }
 
     if (selectedElements.length === 1 && selectedElements[0].tagName === 'path' && selectedElements[0].getAttribute('d').includes('Z')) {
       createVertexHandles(selectedElements[0])
+      notifySelectionChange()
       return
     }
 
@@ -315,11 +336,13 @@ export function select(svg) {
     transformGroup.insertBefore(line, rotHandle)
 
     svg.appendChild(transformGroup)
+    notifySelectionChange()
   }
 
   function clearSelection() {
     selectedElements = []
     updateTransformHandles()
+    notifySelectionChange()
   }
 
   function captureState(pos) {
@@ -720,6 +743,10 @@ export function select(svg) {
         transformGroup.setAttribute('transform', `translate(${tx}, ${ty}) scale(${sx}, ${sy})`)
       }
     }
+
+    if (dragMode === 'move' || dragMode === 'resize' || dragMode === 'rotate' || dragMode === 'vertex') {
+        notifySelectionChange();
+    }
   }
 
   function onMouseUp(evt) {
@@ -776,6 +803,7 @@ export function select(svg) {
 
       if (changes.length > 0) {
         history.push({
+          desc: 'Transform elements',
           undo: () => {
             changes.forEach((c) => {
               if (c.oldTransform) c.el.setAttribute('transform', c.oldTransform)
@@ -897,6 +925,7 @@ export function select(svg) {
       })
 
       history.push({
+        desc: 'Delete elements',
         undo: () => {
           elementsToRemove.forEach((el, i) => {
             const info = parentsInfo[i]

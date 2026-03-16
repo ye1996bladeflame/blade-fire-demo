@@ -139,6 +139,7 @@ export function polygon(svg) {
         const path = activePath;
         
         history.push({
+            desc: 'Create Polygon',
             undo: () => {
                 if (path && path.parentNode) {
                     path.remove();
