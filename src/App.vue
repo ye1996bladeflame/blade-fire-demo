@@ -21,19 +21,22 @@
     </a-layout-content>
     <a-layout-sider theme="light" width="300" class="right-sider">
       <div class="right-panel-content">
-        <a-card title="属性" size="small" :bordered="false">
+        <a-card title="属性" size="small" :bordered="false" class="panel-card" :bodyStyle="{ flex: 1, overflowY: 'auto', minHeight: 0 }">
           <a-empty v-if="selectionInfo.length === 0" description="未选中任何图形" :image="undefined" />
           <div v-else>
             <a-descriptions v-for="(item, idx) in selectionInfo" :key="idx" :title="item.tagName" size="small" :column="1" bordered style="margin-bottom: 16px">
+              <a-descriptions-item label="X">{{ Math.round(item.x) }}</a-descriptions-item>
+              <a-descriptions-item label="Y">{{ Math.round(item.y) }}</a-descriptions-item>
               <a-descriptions-item label="宽度">{{ Math.round(item.width) }}</a-descriptions-item>
               <a-descriptions-item label="高度">{{ Math.round(item.height) }}</a-descriptions-item>
+              <a-descriptions-item label="旋转">{{ Math.round(item.rotation || 0) }}°</a-descriptions-item>
             </a-descriptions>
           </div>
         </a-card>
 
-        <a-divider style="margin: 12px 0" />
+        <a-divider style="margin: 0" />
 
-        <a-card title="历史消息" size="small" :bordered="false" class="history-card" :bodyStyle="{ flex: 1, overflowY: 'auto', minHeight: 0 }">
+        <a-card title="历史消息" size="small" :bordered="false" class="panel-card" :bodyStyle="{ flex: 1, overflowY: 'auto', minHeight: 0 }">
           <a-empty v-if="historyLog.length === 0" description="暂无历史记录" :image="undefined" />
           <div v-else class="history-list">
             <a-card 
@@ -163,7 +166,7 @@ onUnmounted(() => {
   background-color: #fff;
 }
 
-.history-card {
+.panel-card {
   flex: 1;
   display: flex;
   flex-direction: column;

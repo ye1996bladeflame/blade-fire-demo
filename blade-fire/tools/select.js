@@ -33,7 +33,8 @@ export function select(svg, onSelectionChangeCallback) {
           x: bounds.x,
           y: bounds.y,
           width: bounds.width,
-          height: bounds.height
+          height: bounds.height,
+          rotation: (parseTransform(el.getAttribute('transform')).rotate || 0)
         };
       });
       onSelectionChangeCallback(selectionInfo);
