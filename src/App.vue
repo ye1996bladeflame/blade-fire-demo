@@ -3,17 +3,48 @@
     <a-layout-sider theme="light" width="200" class="left-sider">
       <div class="toolbar">
         <div class="toolbar-title">工具</div>
-        <a-button block class="tool-btn" :type="currentTool === 'select' ? 'primary' : 'default'"
-          @click="selectTool('select')">Select</a-button>
-        <a-button block class="tool-btn" :type="currentTool === 'circle' ? 'primary' : 'default'"
-          @click="selectTool('circle')">Circle</a-button>
-        <a-button block class="tool-btn" :type="currentTool === 'rect' ? 'primary' : 'default'"
-          @click="selectTool('rect')">Rect</a-button>
-        <a-button block class="tool-btn" :type="currentTool === 'triangle' ? 'primary' : 'default'"
-          @click="selectTool('triangle')">Triangle</a-button>
-        <a-button block class="tool-btn" :type="currentTool === 'polygon' ? 'primary' : 'default'"
-          @click="selectTool('polygon')">Polygon</a-button>
-        <!-- <a-button block class="tool-btn" :type="currentTool === 'text' ? 'primary' : 'default'" @click="selectTool('text')">Text</a-button> -->
+        <div class="tools-grid">
+          <a-tooltip title="选择 (Select)" placement="right">
+            <div class="tool-icon-btn" :class="{ active: currentTool === 'select' }" @click="selectTool('select')">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"></path>
+                <path d="M13 13l6 6"></path>
+              </svg>
+            </div>
+          </a-tooltip>
+          
+          <a-tooltip title="圆形 (Circle)" placement="right">
+            <div class="tool-icon-btn" :class="{ active: currentTool === 'circle' }" @click="selectTool('circle')">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+              </svg>
+            </div>
+          </a-tooltip>
+          
+          <a-tooltip title="矩形 (Rect)" placement="right">
+            <div class="tool-icon-btn" :class="{ active: currentTool === 'rect' }" @click="selectTool('rect')">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              </svg>
+            </div>
+          </a-tooltip>
+          
+          <a-tooltip title="三角形 (Triangle)" placement="right">
+            <div class="tool-icon-btn" :class="{ active: currentTool === 'triangle' }" @click="selectTool('triangle')">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3l10 18H2L12 3z"></path>
+              </svg>
+            </div>
+          </a-tooltip>
+          
+          <a-tooltip title="多边形 (Polygon)" placement="right">
+            <div class="tool-icon-btn" :class="{ active: currentTool === 'polygon' }" @click="selectTool('polygon')">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2l9 4.9V17L12 22l-9-4.9V7z"></path>
+              </svg>
+            </div>
+          </a-tooltip>
+        </div>
       </div>
     </a-layout-sider>
     <a-layout-content class="content-area">
@@ -151,11 +182,33 @@ onUnmounted(() => {
   gap: 12px;
 }
 
-.toolbar-title {
-  font-weight: bold;
-  margin-bottom: 10px;
-  font-size: 16px;
-  color: #333;
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.tool-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  border-radius: 4px;
+  cursor: pointer;
+  background-color: #f5f5f5;
+  color: #666;
+  transition: all 0.2s;
+}
+
+.tool-icon-btn:hover {
+  background-color: #e6f7ff;
+  color: #1890ff;
+}
+
+.tool-icon-btn.active {
+  background-color: #1890ff;
+  color: white;
+  box-shadow: 0 2px 4px rgba(24, 144, 255, 0.2);
 }
 
 .right-panel-content {
