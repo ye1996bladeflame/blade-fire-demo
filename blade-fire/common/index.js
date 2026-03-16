@@ -161,3 +161,46 @@ export class History {
 }
 
 export const history = new History();
+
+let clipboard = null;
+export function setClipboard(data) {
+  clipboard = data;
+}
+export function getClipboard() {
+  return clipboard;
+}
+
+export function parseTransform(transformStr) {
+    const result = { tx: 0, ty: 0, rotate: 0, cx: 0, cy: 0, sx: 1, sy: 1 };
+    if (!transformStr) return result;
+    
+    const tMatch = transformStr.match(/translate\s*\(\s*([-\d.e]+)\s*[,\s]\s*([-\d.e]+)\s*\)/);
+    if (tMatch) {
+        result.tx = parseFloat(tMatch[1]);
+        result.ty = parseFloat(tMatch[2]);
+    }
+    
+    const rMatch = transformStr.match(/rotate\s*\(\s*([-\d.e]+)(?:\s*[,\s]\s*([-\d.e]+)\s*[,\s]\s*([-\d.e]+))?\s*\)/);
+    if (rMatch) {
+        result.rotate = parseFloat(rMatch[1]);
+        if (rMatch[2] !== undefined) result.cx = parseFloat(rMatch[2]);
+        if (rMatch[3] !== undefined) result.cy = parseFloat(rMatch[3]);
+    }
+    
+    const sMatch = transformStr.match(/scale\s*\(\s*([-\d.e]+)(?:\s*[,\s]\s*([-\d.e]+))?\s*\)/);
+    if (sMatch) {
+        result.sx = parseFloat(sMatch[1]);
+        result.sy = sMatch[2] !== undefined ? parseFloat(sMatch[2]) : result.sx;
+    }
+    
+    return result;
+}
+
+export function getMousePosition(svg, evt) {
+    const CTM = svg.getScreenCTM();
+    if (!CTM) return { x: 0, y: 0 };
+    return {
+        x: (evt.clientX - CTM.e) / CTM.a,
+        y: (evt.clientY - CTM.f) / CTM.d
+    };
+}

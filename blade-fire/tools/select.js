@@ -1,4 +1,4 @@
-import { setCursor, history } from "../common/index.js";
+import { setCursor, history, setClipboard, getClipboard, parseTransform, getMousePosition as getMousePositionCommon } from "../common/index.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -18,42 +18,13 @@ export function select(svg) {
     let dragMode = null; 
     let startPos = { x: 0, y: 0 }; 
     let initialMouse = { x: 0, y: 0 }; 
+    let lastMousePos = { x: 0, y: 0 };
     
     
     let elementStates = []; 
     let groupBounds = null; 
     let resizeHandle = null; 
     
-    
-    function parseTransform(transformStr) {
-        const result = { tx: 0, ty: 0, rotate: 0, cx: 0, cy: 0, sx: 1, sy: 1 };
-        if (!transformStr) return result;
-        
-        
-        const tMatch = transformStr.match(/translate\s*\(\s*([-\d.e]+)\s*[,\s]\s*([-\d.e]+)\s*\)/);
-        if (tMatch) {
-            result.tx = parseFloat(tMatch[1]);
-            result.ty = parseFloat(tMatch[2]);
-        }
-        
-        
-        const rMatch = transformStr.match(/rotate\s*\(\s*([-\d.e]+)(?:\s*[,\s]\s*([-\d.e]+)\s*[,\s]\s*([-\d.e]+))?\s*\)/);
-        if (rMatch) {
-            result.rotate = parseFloat(rMatch[1]);
-            if (rMatch[2] !== undefined) result.cx = parseFloat(rMatch[2]);
-            if (rMatch[3] !== undefined) result.cy = parseFloat(rMatch[3]);
-        }
-        
-        
-        const sMatch = transformStr.match(/scale\s*\(\s*([-\d.e]+)(?:\s*[,\s]\s*([-\d.e]+))?\s*\)/);
-        if (sMatch) {
-            result.sx = parseFloat(sMatch[1]);
-            result.sy = sMatch[2] !== undefined ? parseFloat(sMatch[2]) : result.sx;
-        }
-        
-        return result;
-    }
-
     
     function rotatePoint(x, y, cx, cy, angle) {
         const rad = angle * Math.PI / 180;
@@ -69,12 +40,7 @@ export function select(svg) {
 
     
     function getMousePosition(evt) {
-        const CTM = svg.getScreenCTM();
-        if (!CTM) return { x: 0, y: 0 };
-        return {
-            x: (evt.clientX - CTM.e) / CTM.a,
-            y: (evt.clientY - CTM.f) / CTM.d
-        };
+        return getMousePositionCommon(svg, evt);
     }
 
     
@@ -438,6 +404,7 @@ export function select(svg) {
     function onMouseDown(evt) {
         if (evt.button !== 0) return;
         const pos = getMousePosition(evt);
+        lastMousePos = pos;
         startPos = pos;
         isDragging = true;
         const target = evt.target;
@@ -503,8 +470,9 @@ export function select(svg) {
     }
 
     function onMouseMove(evt) {
-        if (!isDragging) return;
         const pos = getMousePosition(evt);
+        lastMousePos = pos;
+        if (!isDragging) return;
         const dx = pos.x - initialMouse.x;
         const dy = pos.y - initialMouse.y;
 
@@ -952,9 +920,52 @@ export function select(svg) {
     });
 
     
+    function onKeyDown(evt) {
+        if (evt.target.tagName === 'INPUT' || evt.target.tagName === 'TEXTAREA') return;
+
+        // Copy: Ctrl+C
+        if ((evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase() === 'c') {
+            if (selectedElements.length === 0) return;
+            
+            // Calculate bounds center of current selection
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            selectedElements.forEach(el => {
+                const b = getElementGlobalBounds(el);
+                minX = Math.min(minX, b.x);
+                minY = Math.min(minY, b.y);
+                maxX = Math.max(maxX, b.x + b.width);
+                maxY = Math.max(maxY, b.y + b.height);
+            });
+            
+            const centerX = minX + (maxX - minX) / 2;
+            const centerY = minY + (maxY - minY) / 2;
+
+            setClipboard({
+                elements: selectedElements.map(el => {
+                    const attrs = {};
+                    for (let i = 0; i < el.attributes.length; i++) {
+                        const attr = el.attributes[i];
+                        attrs[attr.name] = attr.value;
+                    }
+                    return {
+                        tagName: el.tagName,
+                        attributes: attrs,
+                        innerHTML: el.innerHTML
+                    };
+                }),
+                centerX,
+                centerY
+            });
+            evt.preventDefault();
+        }
+
+        // Paste: Ctrl+V logic removed from here as it is now handled globally
+    }
+
     svg.addEventListener("mousedown", onMouseDown);
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
+    window.addEventListener("keydown", onKeyDown);
 
     return () => {
         isActive = false;
@@ -963,6 +974,7 @@ export function select(svg) {
         svg.removeEventListener("mousedown", onMouseDown);
         window.removeEventListener("mousemove", onMouseMove);
         window.removeEventListener("mouseup", onMouseUp);
+        window.removeEventListener("keydown", onKeyDown);
         if (transformGroup && transformGroup.parentNode) transformGroup.parentNode.removeChild(transformGroup);
         if (selectionRect && selectionRect.parentNode) selectionRect.parentNode.removeChild(selectionRect);
     };
