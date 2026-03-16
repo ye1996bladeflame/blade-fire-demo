@@ -923,6 +923,41 @@ export function select(svg) {
     function onKeyDown(evt) {
         if (evt.target.tagName === 'INPUT' || evt.target.tagName === 'TEXTAREA') return;
 
+        // Delete elements
+        if (evt.key === 'Delete' || evt.key === 'Backspace') {
+            if (selectedElements.length === 0) return;
+
+            const elementsToRemove = [...selectedElements];
+            const parents = elementsToRemove.map(el => el.parentNode);
+            const nextSiblings = elementsToRemove.map(el => el.nextSibling);
+
+            elementsToRemove.forEach(el => {
+                if (el.parentNode) el.parentNode.removeChild(el);
+            });
+
+            history.push({
+                undo: () => {
+                    elementsToRemove.forEach((el, i) => {
+                        if (parents[i]) {
+                            parents[i].insertBefore(el, nextSiblings[i]);
+                        } else {
+                            svg.appendChild(el);
+                        }
+                    });
+                },
+                redo: () => {
+                    elementsToRemove.forEach(el => {
+                        if (el.parentNode) el.parentNode.removeChild(el);
+                    });
+                }
+            });
+
+            selectedElements = [];
+            updateTransformHandles();
+            evt.preventDefault();
+            return;
+        }
+
         // Copy: Ctrl+C
         if ((evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase() === 'c') {
             if (selectedElements.length === 0) return;
