@@ -67,7 +67,7 @@ function onMouseUp(evt) {
              if (width > 0 && height > 0) {
                  const rect = currentRect;
                  history.push({
-                     desc: 'Create Rectangle',
+                     desc: '创建矩形',
                      undo: () => rect.remove(),
                      redo: () => svgElement.appendChild(rect)
                  });

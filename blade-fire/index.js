@@ -123,7 +123,7 @@ class BladeFire {
 
                     // Add to history
                     history.push({
-                        desc: 'Paste elements',
+                        desc: '粘贴元素',
                         undo: () => {
                             newElements.forEach(el => {
                                 if (el.parentNode) el.parentNode.removeChild(el);

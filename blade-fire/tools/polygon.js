@@ -139,7 +139,7 @@ export function polygon(svg) {
         const path = activePath;
         
         history.push({
-            desc: 'Create Polygon',
+            desc: '创建多边形',
             undo: () => {
                 if (path && path.parentNode) {
                     path.remove();

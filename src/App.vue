@@ -28,11 +28,11 @@
             <div v-for="(item, idx) in selectionInfo" :key="idx" class="prop-item">
               <div class="prop-header">{{ item.tagName }}</div>
               <div class="prop-row">
-                <span class="label">Width:</span>
+                <span class="label">宽度:</span>
                 <span class="value">{{ Math.round(item.width) }}</span>
               </div>
               <div class="prop-row">
-                <span class="label">Height:</span>
+                <span class="label">高度:</span>
                 <span class="value">{{ Math.round(item.height) }}</span>
               </div>
             </div>
@@ -45,7 +45,7 @@
           <div v-else class="history-list">
             <div v-for="(item, index) in historyLog" :key="index" class="history-item">
               <span class="index">{{ index + 1 }}.</span>
-              <span class="desc">{{ item.desc || 'Unknown Action' }}</span>
+              <span class="desc">{{ item.desc || '未知操作' }}</span>
             </div>
           </div>
         </div>

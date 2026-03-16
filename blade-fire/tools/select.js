@@ -803,7 +803,7 @@ export function select(svg, onSelectionChangeCallback) {
 
       if (changes.length > 0) {
         history.push({
-          desc: 'Transform elements',
+          desc: '变换元素',
           undo: () => {
             changes.forEach((c) => {
               if (c.oldTransform) c.el.setAttribute('transform', c.oldTransform)
@@ -925,7 +925,7 @@ export function select(svg, onSelectionChangeCallback) {
       })
 
       history.push({
-        desc: 'Delete elements',
+        desc: '删除元素',
         undo: () => {
           elementsToRemove.forEach((el, i) => {
             const info = parentsInfo[i]
