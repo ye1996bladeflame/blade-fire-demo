@@ -56,7 +56,7 @@ const selectTool = (tool) => {
 }
 
 onMounted(() => {
-  BladeFire.init({ container: 'map-container', grid: true, gridSize: 40, zoom: true })
+  BladeFire.init({ container: 'map-container', grid: true, gridSize: 40, zoom: true, ruler: true, crosshair: true })
 })
 </script>
 

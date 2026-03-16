@@ -6,6 +6,8 @@ import { polygon } from "./tools/polygon.js";
 import { text } from "./tools/text.js";
 import { select } from "./tools/select.js";
 import { enableDrag } from "./tools/drag.js";
+import { createRuler } from "./features/ruler.js";
+import { createCrosshair } from "./features/crosshair.js";
 
 class BladeFire {
     version = "1.0.0";
@@ -27,110 +29,115 @@ class BladeFire {
                 enableZoom(svg);
             }
 
-            
+            // Initialize features
+            this.ruler = createRuler(container, svg);
+            if (config.ruler) {
+                this.ruler.enable();
+            }
+
+            this.crosshair = createCrosshair(container);
+            if (config.crosshair) {
+                this.crosshair.enable();
+            }
+
+
             enableDrag(svg);
 
             let lastMousePos = { x: 0, y: 0 };
             window.addEventListener("mousemove", (evt) => {
-                 lastMousePos = getMousePosition(svg, evt);
+                lastMousePos = getMousePosition(svg, evt);
             });
-            
-            
+
+
             window.addEventListener("keydown", (e) => {
-                
+
                 if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
 
                 if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
                     if (e.shiftKey) {
-                         history.redo();
-                         e.preventDefault();
+                        history.redo();
+                        e.preventDefault();
                     } else {
-                         
-                         
-                         
-                         
-                         
-                         
-                         
-                         
-                         
-                         
-                         
-                         
-                         
-                         
-                         
-                         
-                         history.undo();
-                         e.preventDefault();
+                        history.undo();
+                        e.preventDefault();
                     }
                 } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
                     history.redo();
                     e.preventDefault();
                 } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
-                     const clipboard = getClipboard();
-                     if (!clipboard || !clipboard.elements.length) return;
+                    const clipboard = getClipboard();
+                    if (!clipboard || !clipboard.elements.length) return;
 
-                     // Calculate offset
-                     const offsetX = lastMousePos.x - clipboard.centerX;
-                     const offsetY = lastMousePos.y - clipboard.centerY;
+                    // Calculate offset
+                    const offsetX = lastMousePos.x - clipboard.centerX;
+                    const offsetY = lastMousePos.y - clipboard.centerY;
 
-                     const newElements = [];
-                     const svgNS = "http://www.w3.org/2000/svg";
+                    const newElements = [];
+                    const svgNS = "http://www.w3.org/2000/svg";
 
-                     clipboard.elements.forEach(item => {
-                         const newEl = document.createElementNS(svgNS, item.tagName);
-                         
-                         // Copy attributes
-                         Object.keys(item.attributes).forEach(key => {
-                             newEl.setAttribute(key, item.attributes[key]);
-                         });
-                         
-                         if (item.innerHTML) {
-                             newEl.innerHTML = item.innerHTML;
-                         }
+                    clipboard.elements.forEach(item => {
+                        const newEl = document.createElementNS(svgNS, item.tagName);
 
-                         // Adjust position
-                         const transform = newEl.getAttribute("transform") || "";
-                         const tData = parseTransform(transform);
-                         
-                         tData.tx += offsetX;
-                         tData.ty += offsetY;
+                        // Copy attributes
+                        Object.keys(item.attributes).forEach(key => {
+                            newEl.setAttribute(key, item.attributes[key]);
+                        });
 
-                         let tStr = `translate(${tData.tx}, ${tData.ty})`;
-                         if (tData.rotate) {
-                             tStr += ` rotate(${tData.rotate}, ${tData.cx}, ${tData.cy})`;
-                         }
-                         if (tData.sx !== 1 || tData.sy !== 1) {
-                             tStr += ` scale(${tData.sx}, ${tData.sy})`;
-                         }
-                         
-                         newEl.setAttribute("transform", tStr);
-                         
-                         svg.appendChild(newEl);
-                         newElements.push(newEl);
-                     });
+                        if (item.innerHTML) {
+                            newEl.innerHTML = item.innerHTML;
+                        }
 
-                     // Add to history
-                     history.push({
-                         undo: () => {
-                             newElements.forEach(el => {
-                                 if (el.parentNode) el.parentNode.removeChild(el);
-                             });
-                         },
-                         redo: () => {
-                             newElements.forEach(el => svg.appendChild(el));
-                         }
-                     });
-                     
-                     e.preventDefault();
+                        // Adjust position
+                        const transform = newEl.getAttribute("transform") || "";
+                        const tData = parseTransform(transform);
+
+                        tData.tx += offsetX;
+                        tData.ty += offsetY;
+
+                        let tStr = `translate(${tData.tx}, ${tData.ty})`;
+                        if (tData.rotate) {
+                            tStr += ` rotate(${tData.rotate}, ${tData.cx}, ${tData.cy})`;
+                        }
+                        if (tData.sx !== 1 || tData.sy !== 1) {
+                            tStr += ` scale(${tData.sx}, ${tData.sy})`;
+                        }
+
+                        newEl.setAttribute("transform", tStr);
+
+                        svg.appendChild(newEl);
+                        newElements.push(newEl);
+                    });
+
+                    // Add to history
+                    history.push({
+                        undo: () => {
+                            newElements.forEach(el => {
+                                if (el.parentNode) el.parentNode.removeChild(el);
+                            });
+                        },
+                        redo: () => {
+                            newElements.forEach(el => svg.appendChild(el));
+                        }
+                    });
+
+                    e.preventDefault();
                 }
             });
 
-            
+
             this.svg = svg;
 
             return svg;
+        }
+    }
+    static toggleRuler(enable) {
+        if (this.ruler) {
+            enable ? this.ruler.enable() : this.ruler.disable();
+        }
+    }
+    static toggleCrosshair(enable) {
+        if (this.crosshair) {
+            enable ? this.crosshair.enable() : this.crosshair.disable();
         }
     }
     static circle() {
