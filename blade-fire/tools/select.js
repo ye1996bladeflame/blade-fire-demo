@@ -881,29 +881,49 @@ export function select(svg) {
       if (selectedElements.length === 0) return
 
       const elementsToRemove = [...selectedElements]
-      const parentsInfo = elementsToRemove.map((el) => ({
-        parent: el.parentNode,
-        nextSibling: el.nextSibling,
-      }))
+      // Record the state before removing
+      const parentsInfo = elementsToRemove.map((el) => {
+        return {
+          parent: el.parentNode || svg,
+          nextSibling: el.nextSibling,
+        }
+      })
 
+      // Remove from DOM
       elementsToRemove.forEach((el) => {
-        if (el.parentNode) el.parentNode.removeChild(el)
+        if (el.parentNode) {
+          el.parentNode.removeChild(el)
+        }
       })
 
       history.push({
         undo: () => {
           elementsToRemove.forEach((el, i) => {
             const info = parentsInfo[i]
-            if (info.parent) {
-              info.parent.insertBefore(el, info.nextSibling)
-            } else {
+            try {
+              if (info.parent) {
+                // If nextSibling is still valid and in the same parent
+                if (info.nextSibling && info.nextSibling.parentNode === info.parent) {
+                  info.parent.insertBefore(el, info.nextSibling)
+                } else {
+                  // Fallback to appendChild on parent
+                  info.parent.appendChild(el)
+                }
+              } else {
+                // Ultimate fallback
+                svg.appendChild(el)
+              }
+            } catch (err) {
+              console.error("Failed to restore element during undo", err)
               svg.appendChild(el)
             }
           })
         },
         redo: () => {
           elementsToRemove.forEach((el) => {
-            if (el.parentNode) el.parentNode.removeChild(el)
+            if (el.parentNode) {
+              el.parentNode.removeChild(el)
+            }
           })
         },
       })

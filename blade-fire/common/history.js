@@ -2,12 +2,14 @@ export class History {
   constructor() {
     this.undoStack = [];
     this.redoStack = [];
+    this.id = Math.random();
+    console.log("History created with ID:", this.id);
   }
 
   push(action) {
     this.undoStack.push(action);
     this.redoStack = [];
-    console.log("History push", action);
+    console.log("History push on ID:", this.id, action);
   }
 
   undo() {
@@ -15,7 +17,7 @@ export class History {
     const action = this.undoStack.pop();
     this.redoStack.push(action);
     if (action.undo) action.undo();
-    console.log("Undo", action);
+    console.log("Undo on ID:", this.id, action);
   }
 
   redo() {
@@ -23,7 +25,7 @@ export class History {
     const action = this.redoStack.pop();
     this.undoStack.push(action);
     if (action.redo) action.redo();
-    console.log("Redo", action);
+    console.log("Redo on ID:", this.id, action);
   }
 }
 
