@@ -101,9 +101,7 @@ const selectionCleanup = BladeFire.onSelectionChange((info) => {
 监听历史记录变化：
 
 ```javascript
-import { history } from './blade-fire/common/index.js';
-
-const historyCleanup = history.subscribe((stack) => {
+const historyCleanup = BladeFire.onHistoryChange((stack) => {
     console.log('历史记录栈:', stack);
 });
 ```

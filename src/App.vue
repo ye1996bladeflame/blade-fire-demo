@@ -94,7 +94,6 @@
 <script setup>
 import { onMounted, onUnmounted, ref } from 'vue'
 import { BladeFire } from '../blade-fire/index.js'
-import { history } from '../blade-fire/common/index.js'
 
 const currentTool = ref('')
 const selectionInfo = ref([])
@@ -133,7 +132,7 @@ onMounted(() => {
     selectionInfo.value = info
   })
 
-  historyCleanup = history.subscribe((stack) => {
+  historyCleanup = BladeFire.onHistoryChange((stack) => {
     historyLog.value = [...stack]
   })
 })

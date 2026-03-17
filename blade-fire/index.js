@@ -20,6 +20,10 @@ class BladeFire {
         };
     }
 
+    static onHistoryChange(callback) {
+        return history.subscribe(callback);
+    }
+
     static notifySelectionChange(elements) {
         this.selectionListeners.forEach(cb => cb(elements));
     }
