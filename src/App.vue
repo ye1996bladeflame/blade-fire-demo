@@ -2,7 +2,7 @@
   <a-layout class="layout-container">
     <a-layout-sider theme="light" width="200" class="left-sider">
       <div class="toolbar">
-        <div class="toolbar-title">工具</div>
+        <div class="toolbar-title">绘制工具</div>
         <div class="tools-grid">
           <a-tooltip title="选择 (Select)" placement="right">
             <div class="tool-icon-btn" :class="{ active: currentTool === 'select' }" @click="selectTool('select')">
