@@ -237,12 +237,6 @@ export function select(svg, onSelectionChangeCallback) {
       return
     }
 
-    if (selectedElements.length === 1 && selectedElements[0].tagName === 'path' && selectedElements[0].getAttribute('d').includes('Z')) {
-      createVertexHandles(selectedElements[0])
-      notifySelectionChange()
-      return
-    }
-
     transformGroup = document.createElementNS(SVG_NS, 'g')
 
     let bbox
