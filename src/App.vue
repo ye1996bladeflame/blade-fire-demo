@@ -2,6 +2,18 @@
   <a-layout class="layout-container">
     <a-layout-sider theme="light" width="200" class="left-sider">
       <div class="toolbar">
+        <div class="toolbar-title">页面管理</div>
+        <div style="display: flex; gap: 8px; margin-bottom: 16px; align-items: center;">
+          <a-select v-model:value="currentPageId" style="flex: 1" @change="switchPage">
+            <a-select-option v-for="page in pages" :key="page.id" :value="page.id">
+              {{ page.name }}
+            </a-select-option>
+          </a-select>
+          <a-button type="primary" @click="addPage">
+            新增
+          </a-button>
+        </div>
+
         <div class="toolbar-title">绘制工具</div>
         <div class="tools-grid">
           <a-tooltip title="选择 (Select)" placement="right">
@@ -53,6 +65,18 @@
             </div>
           </a-tooltip>
         </div>
+
+        <div class="toolbar-title" style="margin-top: 20px;">辅助工具</div>
+        <div class="tools-grid">
+          <!-- <a-tooltip title="橡皮擦 (Eraser)" placement="right">
+            <div class="tool-icon-btn" :class="{ active: currentTool === 'erase' }" @click="selectTool('erase')">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 13l-5 5L3 8l5-5 10 10z"></path>
+                <path d="M13 18l5 5"></path>
+              </svg>
+            </div>
+          </a-tooltip> -->
+        </div>
       </div>
     </a-layout-sider>
     <a-layout-content class="content-area">
@@ -100,8 +124,13 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, nextTick } from 'vue'
 import { BladeFire } from '../blade-fire/index.js'
+
+// Page Management
+const pages = ref([{ id: 'page-1', name: '画板 1' }])
+const currentPageId = ref('page-1')
+let pageCounter = 1
 
 const currentTool = ref('')
 const selectionInfo = ref([])
@@ -110,6 +139,62 @@ let activeToolCleanup = null
 let selectionCleanup = null
 let historyCleanup = null
 let bladeFireCleanup = null
+let bladeFireInstance = null
+
+const initCanvas = () => {
+  if (bladeFireInstance && bladeFireInstance.destroy) {
+    bladeFireInstance.destroy()
+  }
+  
+  // Clear container
+  const container = document.getElementById('map-container')
+  if (container) {
+    container.innerHTML = ''
+  }
+
+  BladeFire.clearHistory()
+  historyLog.value = []
+  selectionInfo.value = []
+
+  bladeFireInstance = BladeFire.init({ container: 'map-container', grid: true, gridSize: 40, zoom: true })
+  if (bladeFireInstance && bladeFireInstance.destroy) {
+    bladeFireCleanup = bladeFireInstance.destroy
+  }
+
+  if (selectionCleanup) selectionCleanup()
+  selectionCleanup = BladeFire.onSelectionChange((info) => {
+    selectionInfo.value = info
+  })
+
+  if (historyCleanup) historyCleanup()
+  historyCleanup = BladeFire.onHistoryChange((stack) => {
+    historyLog.value = [...stack]
+  })
+  
+  // Restore current tool if any
+  if (currentTool.value) {
+    const tool = currentTool.value
+    currentTool.value = ''
+    selectTool(tool)
+  }
+}
+
+const addPage = () => {
+  pageCounter++
+  const newPage = { id: `page-${pageCounter}`, name: `画板 ${pageCounter}` }
+  pages.value.push(newPage)
+  currentPageId.value = newPage.id
+  switchPage(newPage.id)
+}
+
+const switchPage = (pageId) => {
+  currentPageId.value = pageId
+  // For a real implementation, you'd save the SVG state of the old page and load the new one.
+  // Here we just re-initialize a blank canvas for the new page.
+  nextTick(() => {
+    initCanvas()
+  })
+}
 
 const selectTool = (tool) => {
   // If clicking the same tool, do nothing or toggle? 
@@ -131,18 +216,7 @@ const selectTool = (tool) => {
 }
 
 onMounted(() => {
-  const instance = BladeFire.init({ container: 'map-container', grid: true, gridSize: 40, zoom: true })
-  if (instance && instance.destroy) {
-    bladeFireCleanup = instance.destroy
-  }
-
-  selectionCleanup = BladeFire.onSelectionChange((info) => {
-    selectionInfo.value = info
-  })
-
-  historyCleanup = BladeFire.onHistoryChange((stack) => {
-    historyLog.value = [...stack]
-  })
+  initCanvas()
 })
 
 onUnmounted(() => {

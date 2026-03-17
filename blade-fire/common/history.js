@@ -51,6 +51,12 @@ export class History {
     console.log("Redo on ID:", this.id, action);
     this.notify();
   }
+
+  clear() {
+    this.undoStack = [];
+    this.redoStack = [];
+    this.notify();
+  }
 }
 
 export const history = new History();

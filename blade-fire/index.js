@@ -25,6 +25,10 @@ class BladeFire {
         return history.subscribe(callback);
     }
 
+    static clearHistory() {
+        history.clear();
+    }
+
     static notifySelectionChange(elements) {
         this.selectionListeners.forEach(cb => cb(elements));
     }
@@ -184,10 +188,10 @@ class BladeFire {
         return text(this.svg);
     }
     static freehand() {
-        return freehand(this.svg);
+        return freehand(this.svg, this.drawingLayer);
     }
     static select() {
-        return select(this.svg, (elements) => this.notifySelectionChange(elements));
+        return select(this.drawingLayer || this.svg, (elements) => this.notifySelectionChange(elements));
     }
 }
 
