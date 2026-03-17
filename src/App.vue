@@ -50,6 +50,7 @@
     <a-layout-content class="content-area">
       <div id="map-container"></div>
     </a-layout-content>
+    
     <a-layout-sider theme="light" width="300" class="right-sider">
       <div class="right-panel-content">
         <a-card title="属性" size="small" :bordered="false" class="panel-card" :bodyStyle="{ flex: 1, overflowY: 'auto', minHeight: 0 }">
