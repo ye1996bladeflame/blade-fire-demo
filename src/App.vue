@@ -60,7 +60,7 @@
               <a-descriptions-item label="Y">{{ Math.round(item.y) }}</a-descriptions-item>
               <a-descriptions-item label="宽度">{{ Math.round(item.width) }}</a-descriptions-item>
               <a-descriptions-item label="高度">{{ Math.round(item.height) }}</a-descriptions-item>
-              <a-descriptions-item label="旋转">{{ Math.round(item.rotation || 0) }}°</a-descriptions-item>
+              <a-descriptions-item label="旋转">{{ ((Math.round(item.rotation || 0) % 360) + 360) % 360 }}°</a-descriptions-item>
             </a-descriptions>
           </div>
         </a-card>
