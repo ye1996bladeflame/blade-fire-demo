@@ -5,7 +5,8 @@ import { triangle } from "./tools/triangle.js";
 import { polygon } from "./tools/polygon.js";
 import { text } from "./tools/text.js";
 import { select } from "./tools/select.js";
-import { enableDrag } from "./tools/drag.js";
+import { freehand } from "./tools/freehand.js";
+import { enablePan } from "./features/pan.js";
 import { createRuler } from "./features/ruler.js";
 import { createCrosshair } from "./features/crosshair.js";
 
@@ -58,7 +59,7 @@ class BladeFire {
             }
 
 
-            enableDrag(svg);
+            enablePan(svg);
 
             let lastMousePos = { x: 0, y: 0 };
             const onMouseMove = (evt) => {
@@ -181,6 +182,9 @@ class BladeFire {
     }
     static text() {
         return text(this.svg);
+    }
+    static freehand() {
+        return freehand(this.svg);
     }
     static select() {
         return select(this.svg, (elements) => this.notifySelectionChange(elements));
