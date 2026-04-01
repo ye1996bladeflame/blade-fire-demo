@@ -6,6 +6,7 @@ import { polygon } from "./tools/polygon.js";
 import { text } from "./tools/text.js";
 import { select } from "./tools/select.js";
 import { freehand } from "./tools/freehand.js";
+import { erase } from "./tools/erase.js";
 import { enablePan } from "./features/pan.js";
 import { createRuler } from "./features/ruler.js";
 import { createCrosshair } from "./features/crosshair.js";
@@ -212,6 +213,9 @@ class BladeFire {
     }
     static freehand() {
         return freehand(this.svg, this.drawingLayer);
+    }
+    static erase() {
+        return erase(this.svg);
     }
     static select() {
         return select(this.drawingLayer || this.svg, (elements) => this.notifySelectionChange(elements));

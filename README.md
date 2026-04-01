@@ -17,6 +17,8 @@ BladeFire 是一个轻量级的基于 SVG 的绘图库，用于在浏览器中�
   - **矩形 (Rect)**: 快速绘制矩形。
   - **三角形 (Triangle)**: 快速绘制三角形。
   - **多边形 (Polygon)**: 自定义绘制多边形。
+  - **手绘 (Freehand)**: 自由绘制路径。
+  - **橡皮擦 (Eraser)**: 用于擦除多边形的部分区域。
 - **历史记录**: 完整的撤销 (Undo) 和重做 (Redo) 支持。
 - **剪贴板**: 支持图形的复制与粘贴。
 
@@ -116,7 +118,7 @@ BladeFire.setGlobalStyle({
     "stroke-width": "2"
 });
 
-// 2. 设置特定工具的样式（支持：circle, rect, triangle, polygon, text, freehand 等）
+// 2. 设置特定工具的样式（支持：circle, rect, triangle, polygon, text, freehand, erase 等）
 BladeFire.setToolStyle('rect', {
     fill: 'rgba(255, 0, 0, 0.5)',
     stroke: '#ff0000'

@@ -66,14 +66,14 @@
 
         <div class="toolbar-title" style="margin-top: 20px">辅助工具</div>
         <div class="tools-grid">
-          <!-- <a-tooltip title="橡皮擦 (Eraser)" placement="right">
+          <a-tooltip title="多边形橡皮擦 (Eraser)" placement="right">
             <div class="tool-icon-btn" :class="{ active: currentTool === 'erase' }" @click="selectTool('erase')">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M18 13l-5 5L3 8l5-5 10 10z"></path>
                 <path d="M13 18l5 5"></path>
               </svg>
             </div>
-          </a-tooltip> -->
+          </a-tooltip>
         </div>
       </div>
     </a-layout-sider>
