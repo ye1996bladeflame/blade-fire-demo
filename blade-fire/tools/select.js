@@ -248,9 +248,19 @@ export function select(svg, onSelectionChangeCallback) {
         bbox = el.getBBox()
         const transform = el.getAttribute('transform')
         if (transform) {
-          transformGroup.setAttribute('transform', transform)
           const tData = parseTransform(transform)
           rotation = tData.rotate
+          transformGroup.setAttribute('transform', `translate(${tData.tx}, ${tData.ty}) rotate(${tData.rotate}, ${tData.cx || 0}, ${tData.cy || 0})`)
+          
+          let bx = bbox.x * tData.sx
+          let by = bbox.y * tData.sy
+          let bw = bbox.width * tData.sx
+          let bh = bbox.height * tData.sy
+
+          if (bw < 0) { bx += bw; bw = -bw; }
+          if (bh < 0) { by += bh; bh = -bh; }
+
+          bbox = { x: bx, y: by, width: bw, height: bh }
         }
       } catch (e) {
         bbox = { x: 0, y: 0, width: 0, height: 0 }
@@ -631,6 +641,40 @@ export function select(svg, onSelectionChangeCallback) {
             newY += ldy
           }
 
+          if (newW < 0) {
+            newX += newW;
+            newW = -newW;
+            let swappedHandle = resizeHandle;
+            if (resizeHandle.includes('e')) swappedHandle = swappedHandle.replace('e', 'w');
+            else if (resizeHandle.includes('w')) swappedHandle = swappedHandle.replace('w', 'e');
+            resizeHandle = swappedHandle;
+            
+            s.initWidth = newW;
+            s.initX = newX;
+            initialMouse.x = pos.x;
+            
+            // Re-capture state correctly for reversed dragging
+            captureState(pos);
+            s = elementStates[0];
+          }
+          
+          if (newH < 0) {
+            newY += newH;
+            newH = -newH;
+            let swappedHandle = resizeHandle;
+            if (resizeHandle.includes('n')) swappedHandle = swappedHandle.replace('n', 's');
+            else if (resizeHandle.includes('s')) swappedHandle = swappedHandle.replace('s', 'n');
+            resizeHandle = swappedHandle;
+            
+            s.initHeight = newH;
+            s.initY = newY;
+            initialMouse.y = pos.y;
+            
+            // Re-capture state correctly for reversed dragging
+            captureState(pos);
+            s = elementStates[0];
+          }
+
           if (newW < 1) newW = 1
           if (newH < 1) newH = 1
 
@@ -656,16 +700,52 @@ export function select(svg, onSelectionChangeCallback) {
           let newVisualW = s.initWidth
           let newVisualH = s.initHeight
 
-          if (resizeHandle.includes('e')) newVisualW += ldx
-          if (resizeHandle.includes('s')) newVisualH += ldy
-          if (resizeHandle.includes('w')) newVisualW -= ldx
-          if (resizeHandle.includes('n')) newVisualH -= ldy
+          if (resizeHandle.includes('e')) newVisualW += ldx * Math.sign(s.initSx)
+          if (resizeHandle.includes('s')) newVisualH += ldy * Math.sign(s.initSy)
+          if (resizeHandle.includes('w')) newVisualW -= ldx * Math.sign(s.initSx)
+          if (resizeHandle.includes('n')) newVisualH -= ldy * Math.sign(s.initSy)
 
-          if (newVisualW < 1) newVisualW = 1
-          if (newVisualH < 1) newVisualH = 1
+          if (newVisualW < 0) {
+            newVisualW = -newVisualW;
+            let swappedHandle = resizeHandle;
+            if (resizeHandle.includes('e')) swappedHandle = swappedHandle.replace('e', 'w');
+            else if (resizeHandle.includes('w')) swappedHandle = swappedHandle.replace('w', 'e');
+            resizeHandle = swappedHandle;
+            
+            s.initWidth = newVisualW;
+            s.initSx = -s.initSx;
+            s.initTx += (s.initWidth * s.initSx)
+            
+            initialMouse.x = pos.x;
+            
+            // Re-capture state correctly for reversed dragging
+            captureState(pos);
+            s = elementStates[0];
+          }
 
-          const sx = newVisualW / s.bbox.width
-          const sy = newVisualH / s.bbox.height
+          if (newVisualH < 0) {
+            newVisualH = -newVisualH;
+            let swappedHandle = resizeHandle;
+            if (resizeHandle.includes('n')) swappedHandle = swappedHandle.replace('n', 's');
+            else if (resizeHandle.includes('s')) swappedHandle = swappedHandle.replace('s', 'n');
+            resizeHandle = swappedHandle;
+            
+            s.initHeight = newVisualH;
+            s.initSy = -s.initSy;
+            s.initTy += (s.initHeight * s.initSy)
+            
+            initialMouse.y = pos.y;
+
+            // Re-capture state correctly for reversed dragging
+            captureState(pos);
+            s = elementStates[0];
+          }
+
+          if (Math.abs(newVisualW) < 1) newVisualW = newVisualW < 0 ? -1 : 1
+          if (Math.abs(newVisualH) < 1) newVisualH = newVisualH < 0 ? -1 : 1
+
+          const sx = s.bbox.width === 0 ? s.initSx : (newVisualW / s.bbox.width) * Math.sign(s.initSx)
+          const sy = s.bbox.height === 0 ? s.initSy : (newVisualH / s.bbox.height) * Math.sign(s.initSy)
 
           let anchorLocalX_scaled = s.initX * s.initSx
           let anchorLocalY_scaled = s.initY * s.initSy
@@ -721,11 +801,43 @@ export function select(svg, onSelectionChangeCallback) {
           newY += dy
         }
 
-        if (newW < 1) newW = 1
-        if (newH < 1) newH = 1
+        if (newW < 0) {
+          newX += newW;
+          newW = -newW;
+          let swappedHandle = resizeHandle;
+          if (resizeHandle.includes('e')) swappedHandle = swappedHandle.replace('e', 'w');
+          else if (resizeHandle.includes('w')) swappedHandle = swappedHandle.replace('w', 'e');
+          resizeHandle = swappedHandle;
+          
+          groupBounds.width = newW;
+          groupBounds.x = newX;
+          initialMouse.x = pos.x;
+          
+          // Re-capture state correctly for reversed dragging
+          captureState(pos);
+        }
+        
+        if (newH < 0) {
+          newY += newH;
+          newH = -newH;
+          let swappedHandle = resizeHandle;
+          if (resizeHandle.includes('n')) swappedHandle = swappedHandle.replace('n', 's');
+          else if (resizeHandle.includes('s')) swappedHandle = swappedHandle.replace('s', 'n');
+          resizeHandle = swappedHandle;
+          
+          groupBounds.height = newH;
+          groupBounds.y = newY;
+          initialMouse.y = pos.y;
+          
+          // Re-capture state correctly for reversed dragging
+          captureState(pos);
+        }
 
-        const sx = newW / currentW
-        const sy = newH / currentH
+        if (Math.abs(newW) < 1) newW = newW < 0 ? -1 : 1
+        if (Math.abs(newH) < 1) newH = newH < 0 ? -1 : 1
+
+        const sx = currentW === 0 ? 1 : newW / currentW
+        const sy = currentH === 0 ? 1 : newH / currentH
 
         const tx = newX - groupBounds.x * sx
         const ty = newY - groupBounds.y * sy

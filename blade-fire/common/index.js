@@ -141,7 +141,7 @@ export function getClipboard() {
 }
 
 export function parseTransform(transformStr) {
-    const result = { tx: 0, ty: 0, rotate: 0, cx: 0, cy: 0, sx: 1, sy: 1 };
+    const result = { tx: 0, ty: 0, rotate: 0, sx: 1, sy: 1 };
     if (!transformStr) return result;
     
     const tMatch = transformStr.match(/translate\s*\(\s*([-\d.e]+)\s*[,\s]\s*([-\d.e]+)\s*\)/);
