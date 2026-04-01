@@ -1,4 +1,4 @@
-import { setCursor, history } from "../common/index.js";
+import { setCursor, history, createShape } from "../common/index.js";
 
 let isDrawing = false;
 let startX, startY;
@@ -24,15 +24,12 @@ function onMouseDown(evt) {
     startX = pos.x;
     startY = pos.y;
 
-    const svgNS = "http://www.w3.org/2000/svg";
-    currentRect = document.createElementNS(svgNS, "rect");
-    currentRect.setAttribute("x", startX);
-    currentRect.setAttribute("y", startY);
-    currentRect.setAttribute("width", 0);
-    currentRect.setAttribute("height", 0);
-    currentRect.setAttribute("fill", "rgba(100, 149, 237, 0.3)"); 
-    currentRect.setAttribute("stroke", "#6495ED");
-    currentRect.setAttribute("stroke-width", "1");
+    currentRect = createShape("rect", {
+        x: startX,
+        y: startY,
+        width: 0,
+        height: 0
+    });
     
     svgElement.appendChild(currentRect);
 }

@@ -1,4 +1,4 @@
-import { createGrid, enableZoom, history, getClipboard, parseTransform, getMousePosition } from "./common/index.js";
+import { createGrid, enableZoom, history, getClipboard, parseTransform, getMousePosition, createShape } from "./common/index.js";
 import { circle } from "./tools/circle.js";
 import { rect } from "./tools/rect.js";
 import { triangle } from "./tools/triangle.js";
@@ -27,6 +27,21 @@ class BladeFire {
 
     static clearHistory() {
         history.clear();
+    }
+
+    static createShape(tag, attrs) {
+        const shape = createShape(tag, attrs);
+        if (this.svg) {
+            this.svg.appendChild(shape);
+            // history.push({
+            //     desc: '新增自定义图形',
+            //     undo: () => shape.remove(),
+            //     redo: () => this.svg.appendChild(shape)
+            // });
+        } else {
+            console.warn("BladeFire is not initialized");
+        }
+        return shape;
     }
 
     static notifySelectionChange(elements) {

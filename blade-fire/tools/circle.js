@@ -1,4 +1,4 @@
-import { setCursor, history } from "../common/index.js";
+import { setCursor, history, createShape } from "../common/index.js";
 
 let isDrawing = false;
 let startX, startY;
@@ -24,15 +24,14 @@ function onMouseDown(evt) {
     startX = pos.x;
     startY = pos.y;
 
-    const svgNS = "http://www.w3.org/2000/svg";
-    currentCircle = document.createElementNS(svgNS, "ellipse");
-    currentCircle.setAttribute("cx", startX);
-    currentCircle.setAttribute("cy", startY);
-    currentCircle.setAttribute("rx", 0);
-    currentCircle.setAttribute("ry", 0);
-    currentCircle.setAttribute("fill", "rgba(255, 99, 71, 0.3)"); 
-    currentCircle.setAttribute("stroke", "#FF6347");
-    currentCircle.setAttribute("stroke-width", "1");
+    currentCircle = createShape("ellipse", {
+        cx: startX,
+        cy: startY,
+        rx: 0,
+        ry: 0,
+        fill: "rgba(255, 99, 71, 0.3)",
+        stroke: "#FF6347"
+    });
     
     svgElement.appendChild(currentCircle);
 }

@@ -3,15 +3,13 @@
     <a-layout-sider theme="light" width="200" class="left-sider">
       <div class="toolbar">
         <div class="toolbar-title">页面管理</div>
-        <div style="display: flex; gap: 8px; margin-bottom: 16px; align-items: center;">
+        <div style="display: flex; gap: 8px; margin-bottom: 16px; align-items: center">
           <a-select v-model:value="currentPageId" style="flex: 1" @change="switchPage">
             <a-select-option v-for="page in pages" :key="page.id" :value="page.id">
               {{ page.name }}
             </a-select-option>
           </a-select>
-          <a-button type="primary" @click="addPage">
-            新增
-          </a-button>
+          <a-button type="primary" @click="addPage"> 新增 </a-button>
         </div>
 
         <div class="toolbar-title">绘制工具</div>
@@ -24,7 +22,7 @@
               </svg>
             </div>
           </a-tooltip>
-          
+
           <a-tooltip title="圆形 (Circle)" placement="right">
             <div class="tool-icon-btn" :class="{ active: currentTool === 'circle' }" @click="selectTool('circle')">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -32,7 +30,7 @@
               </svg>
             </div>
           </a-tooltip>
-          
+
           <a-tooltip title="矩形 (Rect)" placement="right">
             <div class="tool-icon-btn" :class="{ active: currentTool === 'rect' }" @click="selectTool('rect')">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -40,7 +38,7 @@
               </svg>
             </div>
           </a-tooltip>
-          
+
           <a-tooltip title="三角形 (Triangle)" placement="right">
             <div class="tool-icon-btn" :class="{ active: currentTool === 'triangle' }" @click="selectTool('triangle')">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -48,7 +46,7 @@
               </svg>
             </div>
           </a-tooltip>
-          
+
           <a-tooltip title="多边形 (Polygon)" placement="right">
             <div class="tool-icon-btn" :class="{ active: currentTool === 'polygon' }" @click="selectTool('polygon')">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -66,7 +64,7 @@
           </a-tooltip>
         </div>
 
-        <div class="toolbar-title" style="margin-top: 20px;">辅助工具</div>
+        <div class="toolbar-title" style="margin-top: 20px">辅助工具</div>
         <div class="tools-grid">
           <!-- <a-tooltip title="橡皮擦 (Eraser)" placement="right">
             <div class="tool-icon-btn" :class="{ active: currentTool === 'erase' }" @click="selectTool('erase')">
@@ -82,7 +80,7 @@
     <a-layout-content class="content-area">
       <div id="map-container"></div>
     </a-layout-content>
-    
+
     <a-layout-sider theme="light" width="300" class="right-sider">
       <div class="right-panel-content">
         <a-card title="属性" size="small" :bordered="false" class="panel-card" :bodyStyle="{ flex: 1, overflowY: 'auto', minHeight: 0 }">
@@ -103,14 +101,7 @@
         <a-card title="历史消息" size="small" :bordered="false" class="panel-card" :bodyStyle="{ flex: 1, overflowY: 'auto', minHeight: 0 }">
           <a-empty v-if="historyLog.length === 0" description="暂无历史记录" :image="undefined" />
           <div v-else class="history-list">
-            <a-card 
-              v-for="(item, index) in historyLog" 
-              :key="index" 
-              size="small" 
-              class="history-item-card" 
-              :bordered="false"
-              :bodyStyle="{ padding: '8px 12px' }"
-            >
+            <a-card v-for="(item, index) in historyLog" :key="index" size="small" class="history-item-card" :bordered="false" :bodyStyle="{ padding: '8px 12px' }">
               <div class="history-content">
                 <span class="history-index">#{{ index + 1 }}</span>
                 <span class="history-desc">{{ item.desc || '未知操作' }}</span>
@@ -145,7 +136,7 @@ const initCanvas = () => {
   if (bladeFireInstance && bladeFireInstance.destroy) {
     bladeFireInstance.destroy()
   }
-  
+
   // Clear container
   const container = document.getElementById('map-container')
   if (container) {
@@ -170,13 +161,22 @@ const initCanvas = () => {
   historyCleanup = BladeFire.onHistoryChange((stack) => {
     historyLog.value = [...stack]
   })
-  
+
   // Restore current tool if any
   if (currentTool.value) {
     const tool = currentTool.value
     currentTool.value = ''
     selectTool(tool)
   }
+  BladeFire.createShape('rect', {
+    x: 120,
+    y: 120,
+    width: 300,
+    height: 300,
+    fill: 'rgba(255, 0, 0, 0.5)',
+    stroke: 'red',
+    'stroke-width': '1',
+  })
 }
 
 const addPage = () => {
@@ -197,7 +197,7 @@ const switchPage = (pageId) => {
 }
 
 const selectTool = (tool) => {
-  // If clicking the same tool, do nothing or toggle? 
+  // If clicking the same tool, do nothing or toggle?
   // For now, let's assume re-selecting resets the tool.
 
   // Cleanup previous tool

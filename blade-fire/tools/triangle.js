@@ -1,4 +1,4 @@
-import { setCursor, history } from "../common/index.js";
+import { setCursor, history, createShape } from "../common/index.js";
 
 let isDrawing = false;
 let startX, startY;
@@ -24,14 +24,9 @@ function onMouseDown(evt) {
     startX = pos.x;
     startY = pos.y;
 
-    const svgNS = "http://www.w3.org/2000/svg";
-    currentTriangle = document.createElementNS(svgNS, "path");
-    
-    
-    currentTriangle.setAttribute("d", `M ${startX} ${startY} L ${startX} ${startY} L ${startX} ${startY} Z`);
-    currentTriangle.setAttribute("fill", "rgba(100, 149, 237, 0.3)"); 
-    currentTriangle.setAttribute("stroke", "#6495ED");
-    currentTriangle.setAttribute("stroke-width", "1");
+    currentTriangle = createShape("path", {
+        d: `M ${startX} ${startY} L ${startX} ${startY} L ${startX} ${startY} Z`
+    });
     
     svgElement.appendChild(currentTriangle);
 }

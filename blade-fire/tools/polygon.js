@@ -1,4 +1,4 @@
-import { setCursor, getOverlayLayer, history } from "../common/index.js";
+import { setCursor, getOverlayLayer, history, createShape } from "../common/index.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -87,16 +87,6 @@ export function polygon(svg) {
         };
     }
 
-    
-    function createSVGElement(tag, attrs = {}) {
-        const el = document.createElementNS(SVG_NS, tag);
-        for (const [key, value] of Object.entries(attrs)) {
-            el.setAttribute(key, value);
-        }
-        return el;
-    }
-
-    
     function updatePath() {
         if (!activePath || points.length === 0) return;
         
@@ -228,7 +218,7 @@ export function polygon(svg) {
 
         if (points.length === 1) {
             
-            activePath = createSVGElement("path", {
+            activePath = createShape("path", {
                 "stroke": "green",
                 "stroke-width": "1",
                 "fill": "none",
@@ -238,11 +228,11 @@ export function polygon(svg) {
             svg.appendChild(activePath);
             
             
-            toolGroup = createSVGElement("g", { "pointer-events": "none" });
+            toolGroup = createShape("g", { "pointer-events": "none" });
             svg.appendChild(toolGroup);
 
             
-            startPointMarker = createSVGElement("circle", {
+            startPointMarker = createShape("circle", {
                 "cx": pos.x,
                 "cy": pos.y,
                 "r": 5,
@@ -254,7 +244,7 @@ export function polygon(svg) {
             svg.appendChild(startPointMarker); 
 
             
-            guideLine = createSVGElement("line", {
+            guideLine = createShape("line", {
                 "x1": pos.x,
                 "y1": pos.y,
                 "x2": pos.x,
@@ -321,7 +311,7 @@ export function polygon(svg) {
         
         if (snapped) {
             if (!snapIndicator) {
-                snapIndicator = createSVGElement("circle", {
+                snapIndicator = createShape("circle", {
                     "r": 5 / (svg.getScreenCTM().a || 1),
                     "fill": "none",
                     "stroke": "orange",

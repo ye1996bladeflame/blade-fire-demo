@@ -1,4 +1,4 @@
-import { setCursor, history } from "../common/index.js";
+import { setCursor, history, createShape } from "../common/index.js";
 
 let svgElement = null;
 let currentInput = null;
@@ -182,18 +182,10 @@ function onMouseDown(evt) {
 
     const pos = getMousePosition(evt);
     
-    
-    const svgNS = "http://www.w3.org/2000/svg";
-    const textNode = document.createElementNS(svgNS, "text");
-    
-    
-    textNode.setAttribute("style", "white-space: pre; fill: rgb(51, 51, 51); font-family: Arial; font-size: 28px;");
-    
-    
-    
-    
-    textNode.setAttribute("transform", `translate(${pos.x}, ${pos.y})`);
-    
+    const textNode = createShape("text", {
+        "style": "white-space: pre; fill: rgb(51, 51, 51); font-family: Arial; font-size: 28px;",
+        "transform": `translate(${pos.x}, ${pos.y})`
+    });
     
     textNode.textContent = "Text";
     

@@ -1,4 +1,4 @@
-import { setCursor, history } from "../common/index.js";
+import { setCursor, history, createShape } from "../common/index.js";
 
 let isDrawing = false;
 let currentPath = null;
@@ -21,18 +21,15 @@ function onMouseDown(evt) {
     isDrawing = true;
     const pos = getMousePosition(evt);
     
-    const svgNS = "http://www.w3.org/2000/svg";
-    currentPath = document.createElementNS(svgNS, "path");
-    
     // Start path
     pathData = `M ${pos.x} ${pos.y}`;
     
-    currentPath.setAttribute("d", pathData);
-    currentPath.setAttribute("fill", "rgba(100, 149, 237, 0.3)"); 
-    currentPath.setAttribute("stroke", "#6495ED");
-    currentPath.setAttribute("stroke-width", "1");
-    currentPath.setAttribute("stroke-linejoin", "round");
-    currentPath.setAttribute("stroke-linecap", "round");
+    currentPath = createShape("path", {
+        d: pathData,
+        fill: "rgba(100, 149, 237, 0.3)",
+        "stroke-linecap": "round",
+        "stroke-linejoin": "round"
+    });
     
     svgElement.appendChild(currentPath);
 }
