@@ -42,7 +42,7 @@ function onMouseDown(evt) {
         d: pathData,
         fill: "none",
         stroke: "rgba(255, 255, 255, 0.8)",
-        "stroke-width": ERASER_RADIUS * 2,
+        "stroke-width": ERASER_RADIUS * 1,
         "stroke-linecap": "round",
         "stroke-linejoin": "round",
         "pointer-events": "none",
@@ -56,6 +56,15 @@ function onMouseMove(evt) {
     if (!isDrawing || !eraserPath) return;
 
     const pos = getMousePosition(evt);
+    
+    // 只有当鼠标移动距离超过一定阈值时才添加点，减少计算量
+    const lastPos = points[points.length - 1];
+    const dx = pos.x - lastPos.x;
+    const dy = pos.y - lastPos.y;
+    if (Math.sqrt(dx*dx + dy*dy) < ERASER_RADIUS / 2) {
+        return;
+    }
+
     points.push(pos);
     
     pathData += ` L ${pos.x} ${pos.y}`;
@@ -153,9 +162,10 @@ function parsePathToMultiPolygon(d) {
     return multiPolygon;
 }
 
-function multiPolygonToPath(multiPolygon) {
-    let d = "";
+function multiPolygonToPathList(multiPolygon) {
+    let paths = [];
     for (const poly of multiPolygon) {
+        let d = "";
         for (const ring of poly) {
             if (ring.length === 0) continue;
             d += `M ${ring[0][0]} ${ring[0][1]} `;
@@ -164,13 +174,27 @@ function multiPolygonToPath(multiPolygon) {
             }
             d += "Z ";
         }
+        if (d) paths.push(d.trim());
     }
-    return d.trim();
+    return paths;
 }
 
 function getEraserMultiPolygon(points, radius) {
     let polys = [];
-    // 为线段生成矩形多边形
+    const segments = 16;
+    
+    // Helper to create circle polygon
+    function createCirclePoly(p) {
+        let ring = [];
+        for (let i = 0; i < segments; i++) {
+            let angle = (i / segments) * Math.PI * 2;
+            ring.push([p.x + Math.cos(angle) * radius, p.y + Math.sin(angle) * radius]);
+        }
+        ring.push([...ring[0]]);
+        return [ring];
+    }
+
+    // For each segment, add a rotated rectangle
     for (let i = 0; i < points.length - 1; i++) {
         let p1 = points[i];
         let p2 = points[i+1];
@@ -190,16 +214,9 @@ function getEraserMultiPolygon(points, radius) {
         ]];
         polys.push(poly);
     }
-    // 为每个点生成方形多边形以覆盖连接处
+    // For each point, generate a circular polygon to make the path smooth
     for (let i = 0; i < points.length; i++) {
-        let p = points[i];
-        polys.push([[
-            [p.x - radius, p.y - radius],
-            [p.x + radius, p.y - radius],
-            [p.x + radius, p.y + radius],
-            [p.x - radius, p.y + radius],
-            [p.x - radius, p.y - radius]
-        ]]);
+        polys.push(createCirclePoly(points[i]));
     }
     
     if (polys.length === 0) return null;
@@ -217,6 +234,7 @@ function applyEraser(points) {
 
     const paths = Array.from(svgElement.querySelectorAll('path'));
     const modifications = [];
+    const newElements = [];
 
     paths.forEach(pathEl => {
         if (pathEl.getAttribute("data-is-grid") || pathEl.getAttribute("data-is-eraser")) return;
@@ -229,14 +247,42 @@ function applyEraser(points) {
             if (targetPoly.length === 0) return;
 
             const diff = polygonClipping.difference(targetPoly, eraserPoly);
-            const newD = multiPolygonToPath(diff);
+            const pathDataList = multiPolygonToPathList(diff);
             
-            if (d !== newD) {
+            // 如果擦除后没有任何路径了
+            if (pathDataList.length === 0) {
                 modifications.push({
                     element: pathEl,
                     oldD: d,
-                    newD: newD
+                    action: 'remove'
                 });
+            } else {
+                // 如果擦除后变成了多个独立的闭合多边形
+                // 我们保留原有的 path 元素作为第一个多边形，并为其他多边形创建新的 path 元素
+                const firstD = pathDataList[0];
+                if (d !== firstD || pathDataList.length > 1) {
+                    const mod = {
+                        element: pathEl,
+                        oldD: d,
+                        newD: firstD,
+                        action: 'modify',
+                        addedElements: []
+                    };
+
+                    // 处理分离出来的其他多边形块
+                    for (let i = 1; i < pathDataList.length; i++) {
+                        const newPath = pathEl.cloneNode(true);
+                        newPath.setAttribute("d", pathDataList[i]);
+                        // 需要生成一个新的 uid
+                        const oldUid = newPath.getAttribute("uid");
+                        if (oldUid) {
+                            newPath.setAttribute("uid", oldUid + "-part" + i);
+                        }
+                        mod.addedElements.push(newPath);
+                        newElements.push(newPath);
+                    }
+                    modifications.push(mod);
+                }
             }
         } catch (e) {
             console.error("Clipping error on path", pathEl, e);
@@ -245,10 +291,11 @@ function applyEraser(points) {
 
     if (modifications.length > 0) {
         modifications.forEach(mod => {
-            if (mod.newD) {
-                mod.element.setAttribute("d", mod.newD);
-            } else {
+            if (mod.action === 'remove') {
                 mod.element.style.display = "none";
+            } else if (mod.action === 'modify') {
+                mod.element.setAttribute("d", mod.newD);
+                mod.addedElements.forEach(el => svgElement.appendChild(el));
             }
         });
 
@@ -258,14 +305,18 @@ function applyEraser(points) {
                 modifications.forEach(mod => {
                     mod.element.setAttribute("d", mod.oldD);
                     mod.element.style.display = "";
+                    if (mod.addedElements) {
+                        mod.addedElements.forEach(el => el.remove());
+                    }
                 });
             },
             redo: () => {
                 modifications.forEach(mod => {
-                    if (mod.newD) {
-                        mod.element.setAttribute("d", mod.newD);
-                    } else {
+                    if (mod.action === 'remove') {
                         mod.element.style.display = "none";
+                    } else if (mod.action === 'modify') {
+                        mod.element.setAttribute("d", mod.newD);
+                        mod.addedElements.forEach(el => svgElement.appendChild(el));
                     }
                 });
             }
