@@ -147,7 +147,7 @@ const initCanvas = () => {
   historyLog.value = []
   selectionInfo.value = []
 
-  bladeFireInstance = BladeFire.init({ container: 'map-container', grid: true, gridSize: 40, zoom: true })
+  bladeFireInstance = BladeFire.init({ container: 'map-container', grid: true, gridSize: 40, zoom: true,ruler:true })
   if (bladeFireInstance && bladeFireInstance.destroy) {
     bladeFireCleanup = bladeFireInstance.destroy
   }
