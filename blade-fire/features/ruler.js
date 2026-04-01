@@ -101,41 +101,35 @@ export function createRuler(container, svg) {
         // Prevent infinite loop if step is invalid
         if (step <= 0 || !isFinite(step)) step = 10;
 
+        // Calculate start index
+        const firstTick = Math.ceil(startUnit / step) * step;
+        
         // Draw ticks
         const maxPos = isHorizontal ? width : height;
         
-        const numSubSteps = 10;
-        const subStep = step / numSubSteps;
-        const firstTickIndex = Math.ceil(startUnit / subStep);
+        // Text alignment
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
         
-        for (let i = 0; ; i++) {
-            const u = (firstTickIndex + i) * subStep;
+        for (let u = firstTick; ; u += step) {
             const pos = (u - startUnit) / scale;
             if (pos > maxPos + 50) break; // Allow some overflow
             
-            const isMajor = (firstTickIndex + i) % numSubSteps === 0;
-            const isHalf = (firstTickIndex + i) % (numSubSteps / 2) === 0;
-            
             ctx.beginPath();
-            const tickLen = isMajor ? 6 : (isHalf ? 4 : 2);
             
             if (isHorizontal) {
                 ctx.moveTo(pos, height);
-                ctx.lineTo(pos, height - tickLen);
-                if (isMajor) {
-                    ctx.fillText(Math.round(u * 100) / 100, pos + 2, height - 2);
-                }
+                ctx.lineTo(pos, height - 6);
+                ctx.fillText(Math.round(u * 100) / 100, pos, height - 8);
             } else {
                 ctx.moveTo(width, pos);
-                ctx.lineTo(width - tickLen, pos);
+                ctx.lineTo(width - 6, pos);
                 
-                if (isMajor) {
-                    ctx.save();
-                    ctx.translate(width - 2, pos + 2);
-                    ctx.rotate(-Math.PI / 2);
-                    ctx.fillText(Math.round(u * 100) / 100, 0, 0);
-                    ctx.restore();
-                }
+                ctx.save();
+                ctx.translate(width - 8, pos);
+                ctx.rotate(-Math.PI / 2);
+                ctx.fillText(Math.round(u * 100) / 100, 0, 0);
+                ctx.restore();
             }
             ctx.stroke();
         }
