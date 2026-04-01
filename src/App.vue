@@ -176,6 +176,23 @@ const initCanvas = () => {
     fill: 'rgba(255, 0, 0, 0.5)',
     stroke: 'red',
     'stroke-width': '1',
+    uid:'666666'
+  })
+  BladeFire.createShape('circle', {
+    cx: 240,
+    cy: 240,
+    r: 100,
+    fill: 'rgba(0, 255, 0, 0.5)',
+    stroke: 'green',
+    'stroke-width': '1',
+    uid:'777777'
+  })
+  BladeFire.createShape('path', {
+    d: 'M 120 120 L 240 240 L 11 240 L 44 120 L Z',
+    fill: '#00ff0080',
+    stroke: '#00ff0080',
+    'stroke-width': '1',
+    uid:'888888'
   })
 }
 

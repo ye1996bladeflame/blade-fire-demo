@@ -1,4 +1,4 @@
-import { setCursor, getOverlayLayer, history, createShape } from "../common/index.js";
+import { setCursor, getOverlayLayer, history, createShape, getToolStyle } from "../common/index.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -219,11 +219,9 @@ export function polygon(svg) {
         if (points.length === 1) {
             
             activePath = createShape("path", {
-                "stroke": "green",
-                "stroke-width": "1",
-                "fill": "none",
                 "stroke-linejoin": "round",
-                "stroke-linecap": "round"
+                "stroke-linecap": "round",
+                ...getToolStyle("polygon")
             });
             svg.appendChild(activePath);
             

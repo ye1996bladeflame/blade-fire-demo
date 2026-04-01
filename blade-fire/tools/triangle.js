@@ -1,4 +1,4 @@
-import { setCursor, history, createShape } from "../common/index.js";
+import { setCursor, history, createShape, getToolStyle } from "../common/index.js";
 
 let isDrawing = false;
 let startX, startY;
@@ -25,7 +25,8 @@ function onMouseDown(evt) {
     startY = pos.y;
 
     currentTriangle = createShape("path", {
-        d: `M ${startX} ${startY} L ${startX} ${startY} L ${startX} ${startY} Z`
+        d: `M ${startX} ${startY} L ${startX} ${startY} L ${startX} ${startY} Z`,
+        ...getToolStyle("triangle")
     });
     
     svgElement.appendChild(currentTriangle);

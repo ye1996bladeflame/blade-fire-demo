@@ -1,4 +1,4 @@
-import { setCursor, history, createShape } from "../common/index.js";
+import { setCursor, history, createShape, getToolStyle } from "../common/index.js";
 
 let isDrawing = false;
 let startX, startY;
@@ -28,7 +28,8 @@ function onMouseDown(evt) {
         x: startX,
         y: startY,
         width: 0,
-        height: 0
+        height: 0,
+        ...getToolStyle("rect")
     });
     
     svgElement.appendChild(currentRect);

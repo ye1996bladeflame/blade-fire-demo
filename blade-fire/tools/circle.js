@@ -1,4 +1,4 @@
-import { setCursor, history, createShape } from "../common/index.js";
+import { setCursor, history, createShape, getToolStyle } from "../common/index.js";
 
 let isDrawing = false;
 let startX, startY;
@@ -29,8 +29,7 @@ function onMouseDown(evt) {
         cy: startY,
         rx: 0,
         ry: 0,
-        fill: "rgba(255, 99, 71, 0.3)",
-        stroke: "#FF6347"
+        ...getToolStyle("circle")
     });
     
     svgElement.appendChild(currentCircle);

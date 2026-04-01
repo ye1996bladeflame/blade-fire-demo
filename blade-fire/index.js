@@ -1,4 +1,4 @@
-import { createGrid, enableZoom, history, getClipboard, parseTransform, getMousePosition, createShape } from "./common/index.js";
+import { createGrid, enableZoom, history, getClipboard, parseTransform, getMousePosition, createShape, setToolStyle, setGlobalStyle } from "./common/index.js";
 import { circle } from "./tools/circle.js";
 import { rect } from "./tools/rect.js";
 import { triangle } from "./tools/triangle.js";
@@ -27,6 +27,14 @@ class BladeFire {
 
     static clearHistory() {
         history.clear();
+    }
+
+    static setToolStyle(toolName, style) {
+        setToolStyle(toolName, style);
+    }
+
+    static setGlobalStyle(style) {
+        setGlobalStyle(style);
     }
 
     static createShape(tag, attrs) {

@@ -130,7 +130,7 @@ export function getOverlayLayer(svg) {
 }
 
 export { history } from './history.js';
-export { createShape, SVG_NS } from './element.js';
+export { createShape, SVG_NS, getToolStyle, setToolStyle, setGlobalStyle } from './element.js';
 
 let clipboard = null;
 export function setClipboard(data) {

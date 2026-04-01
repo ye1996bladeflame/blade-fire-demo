@@ -1,4 +1,4 @@
-import { setCursor, history, createShape } from "../common/index.js";
+import { setCursor, history, createShape, getToolStyle } from "../common/index.js";
 
 let isDrawing = false;
 let currentPath = null;
@@ -26,9 +26,7 @@ function onMouseDown(evt) {
     
     currentPath = createShape("path", {
         d: pathData,
-        fill: "rgba(100, 149, 237, 0.3)",
-        "stroke-linecap": "round",
-        "stroke-linejoin": "round"
+        ...getToolStyle("freehand")
     });
     
     svgElement.appendChild(currentPath);

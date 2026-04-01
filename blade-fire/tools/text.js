@@ -1,4 +1,4 @@
-import { setCursor, history, createShape } from "../common/index.js";
+import { setCursor, history, createShape, getToolStyle } from "../common/index.js";
 
 let svgElement = null;
 let currentInput = null;
@@ -183,8 +183,9 @@ function onMouseDown(evt) {
     const pos = getMousePosition(evt);
     
     const textNode = createShape("text", {
-        "style": "white-space: pre; fill: rgb(51, 51, 51); font-family: Arial; font-size: 28px;",
-        "transform": `translate(${pos.x}, ${pos.y})`
+        "style": "white-space: pre; font-family: Arial; font-size: 28px;",
+        "transform": `translate(${pos.x}, ${pos.y})`,
+        ...getToolStyle("text")
     });
     
     textNode.textContent = "Text";
