@@ -14,7 +14,7 @@ function getMousePosition(evt) {
 }
 
 function startEditing(textNode, isNew = false) {
-    
+
     if (currentInput) {
         currentInput.blur();
     }
@@ -24,20 +24,20 @@ function startEditing(textNode, isNew = false) {
 
     const textContent = textNode.textContent;
     const rect = textNode.getBoundingClientRect();
-    
-    
+
+
     const input = document.createElement("input");
     input.type = "text";
     input.value = textContent;
-    
-    
+
+
     const style = window.getComputedStyle(textNode);
     input.style.position = "absolute";
     input.style.left = (rect.left + window.scrollX) + "px";
-    
-    
+
+
     input.style.top = (rect.top + window.scrollY) + "px";
-    
+
     input.style.fontFamily = style.fontFamily;
     input.style.fontSize = style.fontSize;
     input.style.color = style.fill;
@@ -55,31 +55,31 @@ function startEditing(textNode, isNew = false) {
 
     currentInput = input;
 
-    
-    
-    
+
+
+
     textNode.style.visibility = "hidden";
 
     const finishEditing = () => {
-        
+
         if (!currentInput) return;
-        
+
         const newValue = input.value;
-        const textNodeRef = textNode; 
-        
+        const textNodeRef = textNode;
+
         if (newValue.trim() !== "") {
             textNode.textContent = newValue;
             textNode.style.visibility = "visible";
-            
+
             if (isNewText) {
-                
+
                 history.push({
                     desc: '创建文本',
                     undo: () => textNodeRef.remove(),
                     redo: () => svgElement.appendChild(textNodeRef)
                 });
             } else if (newValue !== initialContent) {
-                
+
                 const oldContent = initialContent;
                 const newContent = newValue;
                 history.push({
@@ -89,27 +89,27 @@ function startEditing(textNode, isNew = false) {
                 });
             }
         } else {
-            
+
             textNode.remove();
-            
+
             if (!isNewText) {
-                 
-                 const oldContent = initialContent;
-                 
-                 
-                 
-                 history.push({
-                     desc: '删除文本',
-                     undo: () => { 
-                         textNodeRef.textContent = oldContent;
-                         textNodeRef.style.visibility = "visible";
-                         svgElement.appendChild(textNodeRef);
-                     },
-                     redo: () => textNodeRef.remove()
-                 });
+
+                const oldContent = initialContent;
+
+
+
+                history.push({
+                    desc: '删除文本',
+                    undo: () => {
+                        textNodeRef.textContent = oldContent;
+                        textNodeRef.style.visibility = "visible";
+                        svgElement.appendChild(textNodeRef);
+                    },
+                    redo: () => textNodeRef.remove()
+                });
             }
         }
-        
+
         input.remove();
         currentInput = null;
     };
@@ -117,10 +117,10 @@ function startEditing(textNode, isNew = false) {
     input.addEventListener("blur", finishEditing);
     input.addEventListener("keydown", (e) => {
         if (e.key === "Enter") {
-            input.blur(); 
+            input.blur();
         }
         if (e.key === "Escape") {
-            
+
             textNode.style.visibility = "visible";
             input.remove();
             currentInput = null;
@@ -129,51 +129,15 @@ function startEditing(textNode, isNew = false) {
 }
 
 function onMouseDown(evt) {
-    
     if (evt.button !== 0) return;
-    
-    
-    
-    
     if (currentInput) {
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
         if (evt.target.tagName === "text") {
-             
-             
-             
-             
         } else {
-             
-             
-             return;
+            return;
         }
     }
-    
-    
+
+
     if (evt.target.tagName === "text") {
         evt.stopPropagation();
         startEditing(evt.target);
@@ -181,20 +145,20 @@ function onMouseDown(evt) {
     }
 
     const pos = getMousePosition(evt);
-    
+
     const textNode = createShape("text", {
         "style": "white-space: pre; font-family: Arial; font-size: 28px;",
         "transform": `translate(${pos.x}, ${pos.y})`,
         ...getToolStyle("text")
     });
-    
+
     textNode.textContent = "Text";
-    
+
     svgElement.appendChild(textNode);
     console.log("Text added at", pos.x, pos.y);
-    
-    
-    
+
+
+
     setTimeout(() => {
         startEditing(textNode, true);
     }, 0);
@@ -202,7 +166,7 @@ function onMouseDown(evt) {
 
 export function text(svg) {
     console.log("Text tool activated");
-    
+
     svgElement = svg;
     if (!svgElement) {
         console.error("BladeFire SVG not initialized");
@@ -211,16 +175,16 @@ export function text(svg) {
 
     setCursor(svgElement, "text");
 
-    
+
     svgElement.removeEventListener("mousedown", onMouseDown);
-    
-    
+
+
     svgElement.addEventListener("mousedown", onMouseDown);
-    
+
     return () => {
         svgElement.removeEventListener("mousedown", onMouseDown);
         if (currentInput) {
-            currentInput.blur(); 
+            currentInput.blur();
         }
         console.log("Text tool deactivated");
     };

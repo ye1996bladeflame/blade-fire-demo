@@ -106,6 +106,41 @@ const historyCleanup = BladeFire.onHistoryChange((stack) => {
 });
 ```
 
+### 4. 自定义样式与创建图形
+
+你可以通过全局或特定工具的方式来自定义绘图时的样式，也可以通过代码直接向画布中添加图形。所有创建的图形默认都会分配一个唯一的 `uid`。
+
+```javascript
+// 1. 设置全局默认样式
+BladeFire.setGlobalStyle({
+    "stroke-width": "2"
+});
+
+// 2. 设置特定工具的样式（支持：circle, rect, triangle, polygon, text, freehand 等）
+BladeFire.setToolStyle('rect', {
+    fill: 'rgba(255, 0, 0, 0.5)',
+    stroke: '#ff0000'
+});
+
+// 3. 通过代码直接创建图形并自动添加到画布
+const customRect = BladeFire.createShape('rect', {
+    x: 120,
+    y: 120,
+    width: 300,
+    height: 300,
+    // uid: 'custom-id', // 如果不传，会自动生成唯一 id
+});
+```
+
+### 5. 画布状态与历史记录管理
+
+在进行画板切换或清空操作时，你可以清理历史记录栈：
+
+```javascript
+// 清空历史记录栈，使新画布状态独立
+BladeFire.clearHistory();
+```
+
 ## 快捷键列表
 
 | 快捷键 | 功能 |
