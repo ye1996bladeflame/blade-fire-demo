@@ -30,20 +30,35 @@ export function createGrid(svg, width, height, gridSize) {
   svg.appendChild(rect);
 }
 
+export function refreshGrid(svg, viewBox) {
+  const gridRect = svg.querySelector('.grid-rect');
+  if (!gridRect) return;
+
+  gridRect.setAttribute('x', viewBox.x - viewBox.w);
+  gridRect.setAttribute('y', viewBox.y - viewBox.h);
+  gridRect.setAttribute('width', viewBox.w * 3);
+  gridRect.setAttribute('height', viewBox.h * 3);
+
+  const gridPath = svg.querySelector('#grid path');
+  const gridPattern = svg.querySelector('#grid');
+  if (gridPath && gridPattern && svg.clientWidth > 0) {
+    const strokeWidth = viewBox.w / svg.clientWidth;
+    gridPath.setAttribute('stroke-width', strokeWidth);
+
+    const gridSize = parseFloat(gridPattern.getAttribute('width'));
+    const apparentSize = gridSize * (svg.clientWidth / viewBox.w);
+
+    if (apparentSize < 4) {
+      gridRect.style.visibility = 'hidden';
+    } else {
+      gridRect.style.visibility = 'visible';
+    }
+  }
+}
+
 export function enableZoom(svg) {
   let viewBox = { x: 0, y: 0, w: svg.clientWidth, h: svg.clientHeight };
   const zoomSensitivity = 0.002;
-
-
-  const updateGridRect = () => {
-    const gridRect = svg.querySelector('.grid-rect');
-    if (gridRect) {
-      gridRect.setAttribute('x', viewBox.x);
-      gridRect.setAttribute('y', viewBox.y);
-      gridRect.setAttribute('width', viewBox.w);
-      gridRect.setAttribute('height', viewBox.h);
-    }
-  };
 
 
   if (!svg.getAttribute("viewBox")) {
@@ -53,6 +68,9 @@ export function enableZoom(svg) {
     viewBox = { x: vb[0], y: vb[1], w: vb[2], h: vb[3] };
   }
 
+  const updateGridRect = () => {
+    refreshGrid(svg, viewBox);
+  };
 
   updateGridRect();
 
@@ -97,10 +115,7 @@ export function enableZoom(svg) {
 
 
 
-    const zoomFactor = 1 + e.deltaY * zoomSensitivity;
-
-
-
+    const zoomFactor = Math.max(0.05, 1 + e.deltaY * zoomSensitivity);
 
     const newW = viewBox.w * zoomFactor;
     const newH = viewBox.h * zoomFactor;
@@ -143,6 +158,32 @@ export function getClipboard() {
 export function parseTransform(transformStr) {
     const result = { tx: 0, ty: 0, rotate: 0, sx: 1, sy: 1 };
     if (!transformStr) return result;
+    
+    const mMatch = transformStr.match(/matrix\s*\(\s*([-\d.e]+)\s*[,\s]\s*([-\d.e]+)\s*[,\s]\s*([-\d.e]+)\s*[,\s]\s*([-\d.e]+)\s*[,\s]\s*([-\d.e]+)\s*[,\s]\s*([-\d.e]+)\s*\)/);
+    if (mMatch) {
+        const a = parseFloat(mMatch[1]);
+        const b = parseFloat(mMatch[2]);
+        const c = parseFloat(mMatch[3]);
+        const d = parseFloat(mMatch[4]);
+        const e = parseFloat(mMatch[5]);
+        const f = parseFloat(mMatch[6]);
+        
+        result.tx = e;
+        result.ty = f;
+        
+        result.sx = Math.sqrt(a*a + b*b);
+        result.sy = Math.sqrt(c*c + d*d);
+        
+        const det = a*d - b*c;
+        if (det < 0) {
+            result.sy = -result.sy;
+        }
+        
+        const rotRad = Math.atan2(b, Math.abs(a) > 1e-6 ? a : (a >= 0 ? 1e-6 : -1e-6));
+        result.rotate = rotRad * 180 / Math.PI;
+        
+        return result;
+    }
     
     const tMatch = transformStr.match(/translate\s*\(\s*([-\d.e]+)\s*[,\s]\s*([-\d.e]+)\s*\)/);
     if (tMatch) {

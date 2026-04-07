@@ -57,6 +57,59 @@ export function select(svg, onSelectionChangeCallback) {
     return getMousePositionCommon(svg, evt)
   }
 
+  function matrixToTransformString(matrix, bboxCenterX, bboxCenterY) {
+    let a = matrix.a, b = matrix.b, c = matrix.c, d = matrix.d, e = matrix.e, f = matrix.f;
+    
+    // Check for skew (dot product of column vectors should be 0 for pure scale/rotate)
+    const dot = a * c + b * d;
+    if (Math.abs(dot) > 1e-4) {
+        a = Math.round(a * 10000) / 10000;
+        b = Math.round(b * 10000) / 10000;
+        c = Math.round(c * 10000) / 10000;
+        d = Math.round(d * 10000) / 10000;
+        e = Math.round(e * 10000) / 10000;
+        f = Math.round(f * 10000) / 10000;
+        return `matrix(${a}, ${b}, ${c}, ${d}, ${e}, ${f})`;
+    }
+    
+    let sx = Math.sqrt(a*a + b*b);
+    let sy = Math.sqrt(c*c + d*d);
+    const det = a*d - b*c;
+    if (det < 0) {
+      sy = -sy;
+    }
+    
+    let rotRad = Math.atan2(b, Math.abs(a) > 1e-6 ? a : (a>=0?1e-6:-1e-6));
+    let rot = rotRad * 180 / Math.PI;
+    
+    let cx = bboxCenterX * sx;
+    let cy = bboxCenterY * sy;
+    
+    // Exact mapping of the center point to preserve position even if skew is lost
+    let X = a * bboxCenterX + c * bboxCenterY + e;
+    let Y = b * bboxCenterX + d * bboxCenterY + f;
+    
+    let tx = X - cx;
+    let ty = Y - cy;
+    
+    tx = Math.round(tx * 10000) / 10000;
+    ty = Math.round(ty * 10000) / 10000;
+    rot = Math.round(rot * 10000) / 10000;
+    sx = Math.round(sx * 10000) / 10000;
+    sy = Math.round(sy * 10000) / 10000;
+    cx = Math.round(cx * 10000) / 10000;
+    cy = Math.round(cy * 10000) / 10000;
+    
+    let tStr = `translate(${tx}, ${ty})`;
+    if (Math.abs(rot) > 0.001) {
+        tStr += ` rotate(${rot}, ${cx}, ${cy})`;
+    }
+    if (Math.abs(sx - 1) > 0.001 || Math.abs(sy - 1) > 0.001) {
+        tStr += ` scale(${sx}, ${sy})`;
+    }
+    return tStr;
+  }
+
   function createSelectionRect(x, y) {
     const rect = document.createElementNS(SVG_NS, 'rect')
     rect.setAttribute('x', x)
@@ -73,21 +126,40 @@ export function select(svg, onSelectionChangeCallback) {
 
   function getElementGlobalBounds(el) {
     try {
-      const rect = el.getBoundingClientRect()
-      const svgRect = svg.getBoundingClientRect()
-      const ctm = svg.getScreenCTM().inverse()
-
-      const p1 = new DOMPoint(rect.left, rect.top)
-      const p2 = new DOMPoint(rect.right, rect.bottom)
-
-      const start = p1.matrixTransform(ctm)
-      const end = p2.matrixTransform(ctm)
-
+      const bbox = el.getBBox()
+      
+      // Calculate transform relative to the SVG user space (viewBox space).
+      // Since elements are direct children of the SVG, their transform relative to the 
+      // user space is simply their own transform attribute.
+      let matrix = svg.createSVGMatrix();
+      if (el.transform && el.transform.baseVal.numberOfItems > 0) {
+        for (let i = 0; i < el.transform.baseVal.numberOfItems; i++) {
+          matrix = matrix.multiply(el.transform.baseVal.getItem(i).matrix);
+        }
+      }
+      
+      const pts = [
+        new DOMPoint(bbox.x, bbox.y),
+        new DOMPoint(bbox.x + bbox.width, bbox.y),
+        new DOMPoint(bbox.x + bbox.width, bbox.y + bbox.height),
+        new DOMPoint(bbox.x, bbox.y + bbox.height)
+      ]
+      
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+      
+      pts.forEach(pt => {
+        const transformed = pt.matrixTransform(matrix)
+        if (transformed.x < minX) minX = transformed.x
+        if (transformed.y < minY) minY = transformed.y
+        if (transformed.x > maxX) maxX = transformed.x
+        if (transformed.y > maxY) maxY = transformed.y
+      })
+      
       return {
-        x: start.x,
-        y: start.y,
-        width: end.x - start.x,
-        height: end.y - start.y,
+        x: minX,
+        y: minY,
+        width: maxX - minX,
+        height: maxY - minY
       }
     } catch (e) {
       console.error('Failed to get element bounds:', e)
@@ -250,17 +322,22 @@ export function select(svg, onSelectionChangeCallback) {
         if (transform) {
           const tData = parseTransform(transform)
           rotation = tData.rotate
-          transformGroup.setAttribute('transform', `translate(${tData.tx}, ${tData.ty}) rotate(${tData.rotate}, ${tData.cx || 0}, ${tData.cy || 0})`)
           
-          let bx = bbox.x * tData.sx
-          let by = bbox.y * tData.sy
-          let bw = bbox.width * tData.sx
-          let bh = bbox.height * tData.sy
+          if (transform.includes('matrix(')) {
+              transformGroup.setAttribute('transform', transform)
+              bbox = { x: bbox.x, y: bbox.y, width: bbox.width, height: bbox.height }
+          } else {
+              transformGroup.setAttribute('transform', `translate(${tData.tx}, ${tData.ty}) rotate(${tData.rotate}, ${tData.cx || 0}, ${tData.cy || 0})`)
+              let bx = bbox.x * tData.sx
+              let by = bbox.y * tData.sy
+              let bw = bbox.width * tData.sx
+              let bh = bbox.height * tData.sy
 
-          if (bw < 0) { bx += bw; bw = -bw; }
-          if (bh < 0) { by += bh; bh = -bh; }
+              if (bw < 0) { bx += bw; bw = -bw; }
+              if (bh < 0) { by += bh; bh = -bh; }
 
-          bbox = { x: bx, y: by, width: bw, height: bh }
+              bbox = { x: bx, y: by, width: bw, height: bh }
+          }
         }
       } catch (e) {
         bbox = { x: 0, y: 0, width: 0, height: 0 }
@@ -388,6 +465,15 @@ export function select(svg, onSelectionChangeCallback) {
         initY = bbox.y
       }
 
+      let initMatrix = svg.createSVGMatrix();
+      if (el.transform && el.transform.baseVal.numberOfItems > 0) {
+          for (let i = 0; i < el.transform.baseVal.numberOfItems; i++) {
+              initMatrix = initMatrix.multiply(el.transform.baseVal.getItem(i).matrix);
+          }
+      }
+      let localBBox = {x: 0, y: 0, width: 0, height: 0};
+      try { localBBox = el.getBBox(); } catch(e) {}
+
       elementStates = [
         {
           el,
@@ -405,6 +491,8 @@ export function select(svg, onSelectionChangeCallback) {
           initY: initY,
           initTransform: transform,
           tagName: el.tagName,
+          initMatrix,
+          localBBox
         },
       ]
     } else {
@@ -418,9 +506,24 @@ export function select(svg, onSelectionChangeCallback) {
         minY = Math.min(minY, b.y)
         maxX = Math.max(maxX, b.x + b.width)
         maxY = Math.max(maxY, b.y + b.height)
+        
+        let initMatrix = svg.createSVGMatrix();
+        if (el.transform && el.transform.baseVal.numberOfItems > 0) {
+            for (let i = 0; i < el.transform.baseVal.numberOfItems; i++) {
+                initMatrix = initMatrix.multiply(el.transform.baseVal.getItem(i).matrix);
+            }
+        }
+        
+        let localBBox = {x: 0, y: 0, width: 0, height: 0};
+        try {
+            localBBox = el.getBBox();
+        } catch(e) {}
+        
         return {
           el,
           initTransform: el.getAttribute('transform') || '',
+          initMatrix,
+          localBBox
         }
       })
 
@@ -547,56 +650,76 @@ export function select(svg, onSelectionChangeCallback) {
       setCursor(svg, 'move')
       if (selectedElements.length === 1) {
         const s = elementStates[0]
-        const newTx = s.initTx + dx
-        const newTy = s.initTy + dy
+        const moveMatrix = svg.createSVGMatrix().translate(dx, dy);
+        const combinedMatrix = moveMatrix.multiply(s.initMatrix);
+        const bboxCenterX = s.localBBox.x + s.localBBox.width / 2;
+        const bboxCenterY = s.localBBox.y + s.localBBox.height / 2;
+        const newTransform = matrixToTransformString(combinedMatrix, bboxCenterX, bboxCenterY);
 
-        let tStr = `translate(${newTx}, ${newTy})`
-        if (s.initRot) {
-          tStr += ` rotate(${s.initRot}, ${s.initCx || 0}, ${s.initCy || 0})`
+        s.el.setAttribute('transform', newTransform)
+        
+        if (newTransform.includes('matrix(')) {
+            transformGroup.setAttribute('transform', newTransform)
+        } else {
+            const tData = parseTransform(newTransform)
+            transformGroup.setAttribute('transform', `translate(${tData.tx}, ${tData.ty}) rotate(${tData.rotate}, ${tData.cx || 0}, ${tData.cy || 0})`)
         }
-
-        if (s.initSx !== 1 || s.initSy !== 1) {
-          tStr += ` scale(${s.initSx}, ${s.initSy})`
-        }
-
-        s.el.setAttribute('transform', tStr)
-        transformGroup.setAttribute('transform', tStr)
       } else {
+        const moveMatrix = svg.createSVGMatrix().translate(dx, dy);
         selectedElements.forEach((el, i) => {
           const s = elementStates[i]
-          el.setAttribute('transform', `translate(${dx}, ${dy}) ${s.initTransform}`)
+          const combinedMatrix = moveMatrix.multiply(s.initMatrix);
+          const bboxCenterX = s.localBBox.x + s.localBBox.width / 2;
+          const bboxCenterY = s.localBBox.y + s.localBBox.height / 2;
+          el.setAttribute('transform', matrixToTransformString(combinedMatrix, bboxCenterX, bboxCenterY));
         })
         transformGroup.setAttribute('transform', `translate(${dx}, ${dy})`)
       }
     } else if (dragMode === 'rotate') {
       if (selectedElements.length === 1) {
         const s = elementStates[0]
-        const cx = s.initCx || s.bbox.x + s.bbox.width / 2
-        const cy = s.initCy || s.bbox.y + s.bbox.height / 2
+        const cx = s.initCx !== undefined ? s.initCx : (s.bbox.x + s.bbox.width / 2)
+        const cy = s.initCy !== undefined ? s.initCy : (s.bbox.y + s.bbox.height / 2)
 
-        const centerX = cx * s.initSx + s.initTx
-        const centerY = cy * s.initSy + s.initTy
-
-        const visualCx = (s.bbox.x + s.bbox.width / 2) * s.initSx + s.initTx
-        const visualCy = (s.bbox.y + s.bbox.height / 2) * s.initSy + s.initTy
+        const visualCx = cx * s.initSx + s.initTx
+        const visualCy = cy * s.initSy + s.initTy
 
         const angle = (Math.atan2(pos.y - visualCy, pos.x - visualCx) * 180) / Math.PI + 90
 
-        let tStr = `translate(${s.initTx}, ${s.initTy}) rotate(${angle}, ${(s.bbox.x + s.bbox.width / 2) * s.initSx}, ${(s.bbox.y + s.bbox.height / 2) * s.initSy})`
-        if (s.initSx !== 1 || s.initSy !== 1) {
-          tStr += ` scale(${s.initSx}, ${s.initSy})`
-        }
+        const rotationMatrix = svg.createSVGMatrix()
+            .translate(visualCx, visualCy)
+            .rotate(angle - s.initRot)
+            .translate(-visualCx, -visualCy);
 
-        s.el.setAttribute('transform', tStr)
-        transformGroup.setAttribute('transform', tStr)
+        const combinedMatrix = rotationMatrix.multiply(s.initMatrix);
+        const bboxCenterX = s.localBBox.x + s.localBBox.width / 2;
+        const bboxCenterY = s.localBBox.y + s.localBBox.height / 2;
+        const newTransform = matrixToTransformString(combinedMatrix, bboxCenterX, bboxCenterY);
+
+        s.el.setAttribute('transform', newTransform)
+
+        if (newTransform.includes('matrix(')) {
+            transformGroup.setAttribute('transform', newTransform)
+        } else {
+            const tData = parseTransform(newTransform)
+            transformGroup.setAttribute('transform', `translate(${tData.tx}, ${tData.ty}) rotate(${tData.rotate}, ${tData.cx || 0}, ${tData.cy || 0})`)
+        }
       } else {
         const cx = groupBounds.cx
         const cy = groupBounds.cy
         const angle = (Math.atan2(pos.y - cy, pos.x - cx) * 180) / Math.PI + 90
 
+        const rotationMatrix = svg.createSVGMatrix()
+            .translate(cx, cy)
+            .rotate(angle)
+            .translate(-cx, -cy);
+
         selectedElements.forEach((el, i) => {
           const s = elementStates[i]
-          el.setAttribute('transform', `rotate(${angle}, ${cx}, ${cy}) ${s.initTransform}`)
+          const combinedMatrix = rotationMatrix.multiply(s.initMatrix);
+          const bboxCenterX = s.localBBox.x + s.localBBox.width / 2;
+          const bboxCenterY = s.localBBox.y + s.localBBox.height / 2;
+          el.setAttribute('transform', matrixToTransformString(combinedMatrix, bboxCenterX, bboxCenterY));
         })
         transformGroup.setAttribute('transform', `rotate(${angle}, ${cx}, ${cy})`)
       }
@@ -614,14 +737,16 @@ export function select(svg, onSelectionChangeCallback) {
           ldy = dx * sin + dy * cos
         }
 
-        if (s.tagName === 'rect' || s.tagName === 'image') {
+        if (s.el.tagName === 'rect' || s.el.tagName === 'image') {
           let anchorX = s.initX
           let anchorY = s.initY
 
           if (resizeHandle.includes('w')) anchorX = s.initX + s.initWidth
           if (resizeHandle.includes('n')) anchorY = s.initY + s.initHeight
 
-          const globalAnchor = rotatePoint(anchorX, anchorY, s.initCx || s.bbox.x + s.bbox.width / 2, s.initCy || s.bbox.y + s.bbox.height / 2, s.initRot)
+          const initCx = s.initCx !== undefined ? s.initCx : (s.bbox.x + s.bbox.width / 2);
+          const initCy = s.initCy !== undefined ? s.initCy : (s.bbox.y + s.bbox.height / 2);
+          const globalAnchor = rotatePoint(anchorX, anchorY, initCx, initCy, s.initRot);
           globalAnchor.x += s.initTx
           globalAnchor.y += s.initTy
 
@@ -641,38 +766,38 @@ export function select(svg, onSelectionChangeCallback) {
             newY += ldy
           }
 
-          if (newW < 0) {
-            newX += newW;
-            newW = -newW;
-            let swappedHandle = resizeHandle;
-            if (resizeHandle.includes('e')) swappedHandle = swappedHandle.replace('e', 'w');
-            else if (resizeHandle.includes('w')) swappedHandle = swappedHandle.replace('w', 'e');
-            resizeHandle = swappedHandle;
-            
-            s.initWidth = newW;
-            s.initX = newX;
-            initialMouse.x = pos.x;
-            
-            // Re-capture state correctly for reversed dragging
+          if (newW < 0 || newH < 0) {
+            if (newW < 0) {
+              newX += newW;
+              newW = -newW;
+              if (resizeHandle.includes('e')) resizeHandle = resizeHandle.replace('e', 'w');
+              else if (resizeHandle.includes('w')) resizeHandle = resizeHandle.replace('w', 'e');
+              initialMouse.x = pos.x;
+            }
+            if (newH < 0) {
+              newY += newH;
+              newH = -newH;
+              if (resizeHandle.includes('n')) resizeHandle = resizeHandle.replace('n', 's');
+              else if (resizeHandle.includes('s')) resizeHandle = resizeHandle.replace('s', 'n');
+              initialMouse.y = pos.y;
+            }
+
+            const newCX = newX + newW / 2;
+            const newCY = newY + newH / 2;
+            const rotatedAnchor = rotatePoint(anchorX, anchorY, newCX, newCY, s.initRot);
+            const newTx = globalAnchor.x - rotatedAnchor.x;
+            const newTy = globalAnchor.y - rotatedAnchor.y;
+
+            s.el.setAttribute('x', newX);
+            s.el.setAttribute('y', newY);
+            s.el.setAttribute('width', Math.max(1, newW));
+            s.el.setAttribute('height', Math.max(1, newH));
+            const tStr = `translate(${newTx}, ${newTy}) rotate(${s.initRot}, ${newCX}, ${newCY})`;
+            s.el.setAttribute('transform', tStr);
+            transformGroup.setAttribute('transform', tStr);
+
             captureState(pos);
-            s = elementStates[0];
-          }
-          
-          if (newH < 0) {
-            newY += newH;
-            newH = -newH;
-            let swappedHandle = resizeHandle;
-            if (resizeHandle.includes('n')) swappedHandle = swappedHandle.replace('n', 's');
-            else if (resizeHandle.includes('s')) swappedHandle = swappedHandle.replace('s', 'n');
-            resizeHandle = swappedHandle;
-            
-            s.initHeight = newH;
-            s.initY = newY;
-            initialMouse.y = pos.y;
-            
-            // Re-capture state correctly for reversed dragging
-            captureState(pos);
-            s = elementStates[0];
+            return;
           }
 
           if (newW < 1) newW = 1
@@ -705,48 +830,6 @@ export function select(svg, onSelectionChangeCallback) {
           if (resizeHandle.includes('w')) newVisualW -= ldx * Math.sign(s.initSx)
           if (resizeHandle.includes('n')) newVisualH -= ldy * Math.sign(s.initSy)
 
-          if (newVisualW < 0) {
-            newVisualW = -newVisualW;
-            let swappedHandle = resizeHandle;
-            if (resizeHandle.includes('e')) swappedHandle = swappedHandle.replace('e', 'w');
-            else if (resizeHandle.includes('w')) swappedHandle = swappedHandle.replace('w', 'e');
-            resizeHandle = swappedHandle;
-            
-            s.initWidth = newVisualW;
-            s.initSx = -s.initSx;
-            s.initTx += (s.initWidth * s.initSx)
-            
-            initialMouse.x = pos.x;
-            
-            // Re-capture state correctly for reversed dragging
-            captureState(pos);
-            s = elementStates[0];
-          }
-
-          if (newVisualH < 0) {
-            newVisualH = -newVisualH;
-            let swappedHandle = resizeHandle;
-            if (resizeHandle.includes('n')) swappedHandle = swappedHandle.replace('n', 's');
-            else if (resizeHandle.includes('s')) swappedHandle = swappedHandle.replace('s', 'n');
-            resizeHandle = swappedHandle;
-            
-            s.initHeight = newVisualH;
-            s.initSy = -s.initSy;
-            s.initTy += (s.initHeight * s.initSy)
-            
-            initialMouse.y = pos.y;
-
-            // Re-capture state correctly for reversed dragging
-            captureState(pos);
-            s = elementStates[0];
-          }
-
-          if (Math.abs(newVisualW) < 1) newVisualW = newVisualW < 0 ? -1 : 1
-          if (Math.abs(newVisualH) < 1) newVisualH = newVisualH < 0 ? -1 : 1
-
-          const sx = s.bbox.width === 0 ? s.initSx : (newVisualW / s.bbox.width) * Math.sign(s.initSx)
-          const sy = s.bbox.height === 0 ? s.initSy : (newVisualH / s.bbox.height) * Math.sign(s.initSy)
-
           let anchorLocalX_scaled = s.initX * s.initSx
           let anchorLocalY_scaled = s.initY * s.initSy
 
@@ -756,9 +839,60 @@ export function select(svg, onSelectionChangeCallback) {
           const oldVisualCx = (s.bbox.x + s.bbox.width / 2) * s.initSx
           const oldVisualCy = (s.bbox.y + s.bbox.height / 2) * s.initSy
 
-          const globalAnchor = rotatePoint(anchorLocalX_scaled, anchorLocalY_scaled, oldVisualCx, oldVisualCy, s.initRot)
-          globalAnchor.x += s.initTx
-          globalAnchor.y += s.initTy
+          const oldGlobalAnchor = rotatePoint(anchorLocalX_scaled, anchorLocalY_scaled, oldVisualCx, oldVisualCy, s.initRot)
+          oldGlobalAnchor.x += s.initTx
+          oldGlobalAnchor.y += s.initTy
+
+          if (newVisualW < 0 || newVisualH < 0) {
+            let nextSx = s.initSx;
+            let nextSy = s.initSy;
+
+            if (newVisualW < 0) {
+              newVisualW = -newVisualW;
+              if (resizeHandle.includes('e')) resizeHandle = resizeHandle.replace('e', 'w');
+              else if (resizeHandle.includes('w')) resizeHandle = resizeHandle.replace('w', 'e');
+              nextSx = -s.initSx;
+              initialMouse.x = pos.x;
+            }
+            if (newVisualH < 0) {
+              newVisualH = -newVisualH;
+              if (resizeHandle.includes('n')) resizeHandle = resizeHandle.replace('n', 's');
+              else if (resizeHandle.includes('s')) resizeHandle = resizeHandle.replace('s', 'n');
+              nextSy = -s.initSy;
+              initialMouse.y = pos.y;
+            }
+
+            const sx = (newVisualW / s.bbox.width) * Math.sign(nextSx);
+            const sy = (newVisualH / s.bbox.height) * Math.sign(nextSy);
+
+            let newAnchorX_scaled = s.initX * sx
+            let newAnchorY_scaled = s.initY * sy
+
+            // Note: The anchor handle HAS NOT changed logically in the coordinate space,
+            // we are still pivoting around the same old anchor point logic (before the flip finishes).
+            if (resizeHandle.includes('e')) newAnchorX_scaled = (s.initX + s.bbox.width) * sx
+            if (resizeHandle.includes('s')) newAnchorY_scaled = (s.initY + s.bbox.height) * sy
+
+            const newVisualCx = (s.bbox.x + s.bbox.width / 2) * sx;
+            const newVisualCy = (s.bbox.y + s.bbox.height / 2) * sy;
+
+            const rotatedNewAnchor = rotatePoint(newAnchorX_scaled, newAnchorY_scaled, newVisualCx, newVisualCy, s.initRot);
+            const newTx = oldGlobalAnchor.x - rotatedNewAnchor.x;
+            const newTy = oldGlobalAnchor.y - rotatedNewAnchor.y;
+
+            const tStr = `translate(${newTx}, ${newTy}) rotate(${s.initRot}, ${newVisualCx}, ${newVisualCy}) scale(${sx}, ${sy})`;
+            s.el.setAttribute('transform', tStr);
+            transformGroup.setAttribute('transform', tStr);
+            
+            captureState(pos);
+            return;
+          }
+
+          if (Math.abs(newVisualW) < 1) newVisualW = newVisualW < 0 ? -1 : 1
+          if (Math.abs(newVisualH) < 1) newVisualH = newVisualH < 0 ? -1 : 1
+
+          const sx = s.bbox.width === 0 ? s.initSx : (newVisualW / s.bbox.width) * Math.sign(s.initSx)
+          const sy = s.bbox.height === 0 ? s.initSy : (newVisualH / s.bbox.height) * Math.sign(s.initSy)
 
           let newAnchorX_scaled = s.initX * sx
           let newAnchorY_scaled = s.initY * sy
@@ -771,8 +905,8 @@ export function select(svg, onSelectionChangeCallback) {
 
           const rotatedNewAnchor = rotatePoint(newAnchorX_scaled, newAnchorY_scaled, newVisualCx, newVisualCy, s.initRot)
 
-          const newTx = globalAnchor.x - rotatedNewAnchor.x
-          const newTy = globalAnchor.y - rotatedNewAnchor.y
+          const newTx = oldGlobalAnchor.x - rotatedNewAnchor.x
+          const newTy = oldGlobalAnchor.y - rotatedNewAnchor.y
 
           const tStr = `translate(${newTx}, ${newTy}) rotate(${s.initRot}, ${newVisualCx}, ${newVisualCy}) scale(${sx}, ${sy})`
 
@@ -815,6 +949,7 @@ export function select(svg, onSelectionChangeCallback) {
           
           // Re-capture state correctly for reversed dragging
           captureState(pos);
+          return
         }
         
         if (newH < 0) {
@@ -831,6 +966,7 @@ export function select(svg, onSelectionChangeCallback) {
           
           // Re-capture state correctly for reversed dragging
           captureState(pos);
+          return
         }
 
         if (Math.abs(newW) < 1) newW = newW < 0 ? -1 : 1
@@ -842,17 +978,86 @@ export function select(svg, onSelectionChangeCallback) {
         const tx = newX - groupBounds.x * sx
         const ty = newY - groupBounds.y * sy
 
+        const transformMatrix = svg.createSVGMatrix()
+            .translate(tx, ty)
+            .scaleNonUniform(sx, sy);
+
         selectedElements.forEach((el, i) => {
           const s = elementStates[i]
-          el.setAttribute('transform', `translate(${tx}, ${ty}) scale(${sx}, ${sy}) ${s.initTransform}`)
+          const combinedMatrix = transformMatrix.multiply(s.initMatrix);
+          const bboxCenterX = s.localBBox.x + s.localBBox.width / 2;
+          const bboxCenterY = s.localBBox.y + s.localBBox.height / 2;
+          el.setAttribute('transform', matrixToTransformString(combinedMatrix, bboxCenterX, bboxCenterY));
         })
 
-        transformGroup.setAttribute('transform', `translate(${tx}, ${ty}) scale(${sx}, ${sy})`)
+        // Instead of scaling the transformGroup directly (which scales strokes and handles),
+        // we recreate the bounding box handles to match the new scaled bounds.
+        // Update the logical groupBounds so updateTransformHandles draws it correctly
+        groupBounds.currentX = newX;
+        groupBounds.currentY = newY;
+        groupBounds.currentW = newW;
+        groupBounds.currentH = newH;
+        
+        // Clear transform on the group to prevent distortion of handles
+        transformGroup.removeAttribute('transform');
+        
+        // Force an update of the handles without changing selection
+        const tempGroupBounds = {
+            x: newX,
+            y: newY,
+            width: newW,
+            height: newH
+        };
+        
+        // Quick update of frame and handles positions
+        const frame = transformGroup.querySelector('.selection-frame');
+        if (frame) {
+            frame.setAttribute('x', newX);
+            frame.setAttribute('y', newY);
+            frame.setAttribute('width', newW);
+            frame.setAttribute('height', newH);
+        }
+
+        const handleSize = 8;
+        const positions = [
+            { x: newX, y: newY, type: 'nw' },
+            { x: newX + newW, y: newY, type: 'ne' },
+            { x: newX + newW, y: newY + newH, type: 'se' },
+            { x: newX, y: newY + newH, type: 'sw' },
+            { x: newX + newW / 2, y: newY, type: 'n' },
+            { x: newX + newW, y: newY + newH / 2, type: 'e' },
+            { x: newX + newW / 2, y: newY + newH, type: 's' },
+            { x: newX, y: newY + newH / 2, type: 'w' },
+        ];
+
+        positions.forEach((pos) => {
+            const handle = transformGroup.querySelector(`rect[data-type="${pos.type}"]`);
+            if (handle) {
+                handle.setAttribute('x', pos.x - handleSize / 2);
+                handle.setAttribute('y', pos.y - handleSize / 2);
+            }
+        });
+
+        const rotHandle = transformGroup.querySelector('circle[data-type="rotate"]');
+        const rotLine = transformGroup.querySelector('line');
+        const rotX = newX + newW / 2;
+        const rotY = newY - 20;
+        
+        if (rotHandle) {
+            rotHandle.setAttribute('cx', rotX);
+            rotHandle.setAttribute('cy', rotY);
+        }
+        if (rotLine) {
+            rotLine.setAttribute('x1', rotX);
+            rotLine.setAttribute('y1', rotY + 5);
+            rotLine.setAttribute('x2', rotX);
+            rotLine.setAttribute('y2', newY);
+        }
       }
     }
 
     if (dragMode === 'move' || dragMode === 'resize' || dragMode === 'rotate' || dragMode === 'vertex') {
-        notifySelectionChange();
+        // notifySelectionChange(); // Don't trigger observer changes during drag
     }
   }
 
@@ -966,7 +1171,13 @@ export function select(svg, onSelectionChangeCallback) {
         try {
           const bbox = getElementGlobalBounds(el)
 
-          if (r1.x < bbox.x + bbox.width && r1.x + r1.w > bbox.x && r1.y < bbox.y + bbox.height && r1.y + r1.h > bbox.y) {
+          // 修复：不仅要判断元素的边界矩形（bbox）是否与框选矩形（r1）有重叠，
+          // 更应该判断是否有交集。
+          // 原先逻辑是：r1 必须完全包裹住 bbox，或者只要稍微碰到就算？
+          // 这里改为标准的矩形相交判定（AABB相交）:
+          // bbox.x < r1.x + r1.w && bbox.x + bbox.width > r1.x && bbox.y < r1.y + r1.h && bbox.y + bbox.height > r1.y
+          
+          if (bbox.x < r1.x + r1.w && bbox.x + bbox.width > r1.x && bbox.y < r1.y + r1.h && bbox.y + bbox.height > r1.y) {
             if (!selectedElements.includes(el)) {
               selectedElements.push(el)
             }
@@ -996,7 +1207,7 @@ export function select(svg, onSelectionChangeCallback) {
         }
       }
     })
-    if (needsUpdate) {
+    if (needsUpdate && !isDragging) {
       updateTransformHandles()
     }
   })

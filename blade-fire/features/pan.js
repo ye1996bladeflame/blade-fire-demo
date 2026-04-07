@@ -1,4 +1,4 @@
-import { setCursor } from "../common/index.js";
+import { setCursor, refreshGrid } from "../common/index.js";
 
 export function enablePan(svg) {
     let isDragging = false;
@@ -7,13 +7,7 @@ export function enablePan(svg) {
     let originalCursor = "";
 
     function updateGridRect() {
-        const gridRect = svg.querySelector('.grid-rect');
-        if (gridRect) {
-            gridRect.setAttribute('x', viewBox.x);
-            gridRect.setAttribute('y', viewBox.y);
-            gridRect.setAttribute('width', viewBox.w);
-            gridRect.setAttribute('height', viewBox.h);
-        }
+        refreshGrid(svg, viewBox);
     }
 
     function onMouseDown(evt) {
