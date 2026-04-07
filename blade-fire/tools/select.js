@@ -602,7 +602,7 @@ export function select(svg, onSelectionChangeCallback) {
       }
     } else if (dragMode === 'resize') {
       if (selectedElements.length === 1) {
-        const s = elementStates[0]
+        let s = elementStates[0]
 
         let ldx = dx
         let ldy = dy
