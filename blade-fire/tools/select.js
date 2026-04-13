@@ -1108,8 +1108,15 @@ export function select(svg, onSelectionChangeCallback) {
           }
         }
 
+        // Detect skew changes
+        if (currentTransform !== oldTransform) {
+            changed = true;
+            change.oldTransform = oldTransform;
+            change.newTransform = currentTransform;
+        }
+
         if (changed) {
-          changes.push(change)
+          changes.push({...change})
         }
       })
 
@@ -1121,30 +1128,32 @@ export function select(svg, onSelectionChangeCallback) {
               if (c.oldTransform) c.el.setAttribute('transform', c.oldTransform)
               else c.el.removeAttribute('transform')
 
-              if (c.isVertex) {
+              if (c.isVertex && c.oldD) {
                 c.el.setAttribute('d', c.oldD)
-              } else if (c.isRect) {
+              } else if (c.isRect && c.oldW !== undefined && c.oldH !== undefined) {
                 c.el.setAttribute('x', c.oldX)
                 c.el.setAttribute('y', c.oldY)
                 c.el.setAttribute('width', c.oldW)
                 c.el.setAttribute('height', c.oldH)
               }
             })
+            updateTransformHandles()
           },
           redo: () => {
             changes.forEach((c) => {
               if (c.newTransform) c.el.setAttribute('transform', c.newTransform)
               else c.el.removeAttribute('transform')
 
-              if (c.isVertex) {
+              if (c.isVertex && c.newD) {
                 c.el.setAttribute('d', c.newD)
-              } else if (c.isRect) {
+              } else if (c.isRect && c.newW !== undefined && c.newH !== undefined) {
                 c.el.setAttribute('x', c.newX)
                 c.el.setAttribute('y', c.newY)
                 c.el.setAttribute('width', c.newW)
                 c.el.setAttribute('height', c.newH)
               }
             })
+            updateTransformHandles()
           },
         })
       }
