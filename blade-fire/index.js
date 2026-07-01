@@ -206,7 +206,7 @@ class BladeFire {
         return triangle(this.svg);
     }
     static polygon() {
-        return polygon(this.svg);
+        return polygon(this.svg, (elements) => this.notifySelectionChange(elements));
     }
     static text() {
         return text(this.svg);
