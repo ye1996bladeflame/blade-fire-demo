@@ -64,12 +64,7 @@ function onMouseUp(evt) {
              const width = parseFloat(currentRect.getAttribute("width"));
              const height = parseFloat(currentRect.getAttribute("height"));
              if (width > 0 && height > 0) {
-                 const rect = currentRect;
-                 history.push({
-                     desc: '创建矩形',
-                     undo: () => rect.remove(),
-                     redo: () => svgElement.appendChild(rect)
-                 });
+                 history.commit('创建矩形');
              } else {
                  currentRect.remove();
              }

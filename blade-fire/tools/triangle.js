@@ -70,12 +70,7 @@ function onMouseUp(evt) {
         if (currentTriangle) {
              const bbox = currentTriangle.getBBox();
              if (bbox.width > 0 && bbox.height > 0) {
-                 const triangle = currentTriangle;
-                 history.push({
-                     desc: '创建三角形',
-                     undo: () => triangle.remove(),
-                     redo: () => svgElement.appendChild(triangle)
-                 });
+                 history.commit('创建三角形');
              } else {
                  currentTriangle.remove();
              }

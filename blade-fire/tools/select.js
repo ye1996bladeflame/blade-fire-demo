@@ -1,4 +1,4 @@
-import { setCursor, history, setClipboard, getClipboard, parseTransform, getMousePosition as getMousePositionCommon, createListenerManager } from '../common/index.js'
+import { setCursor, history, setClipboard, getClipboard, parseTransform, getMousePosition as getMousePositionCommon, createListenerManager, serializeElementForClipboard } from '../common/index.js'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
 
@@ -1121,41 +1121,7 @@ export function select(svg, onSelectionChangeCallback) {
       })
 
       if (changes.length > 0) {
-        history.push({
-          desc: '变换元素',
-          undo: () => {
-            changes.forEach((c) => {
-              if (c.oldTransform) c.el.setAttribute('transform', c.oldTransform)
-              else c.el.removeAttribute('transform')
-
-              if (c.isVertex && c.oldD) {
-                c.el.setAttribute('d', c.oldD)
-              } else if (c.isRect && c.oldW !== undefined && c.oldH !== undefined) {
-                c.el.setAttribute('x', c.oldX)
-                c.el.setAttribute('y', c.oldY)
-                c.el.setAttribute('width', c.oldW)
-                c.el.setAttribute('height', c.oldH)
-              }
-            })
-            updateTransformHandles()
-          },
-          redo: () => {
-            changes.forEach((c) => {
-              if (c.newTransform) c.el.setAttribute('transform', c.newTransform)
-              else c.el.removeAttribute('transform')
-
-              if (c.isVertex && c.newD) {
-                c.el.setAttribute('d', c.newD)
-              } else if (c.isRect && c.newW !== undefined && c.newH !== undefined) {
-                c.el.setAttribute('x', c.newX)
-                c.el.setAttribute('y', c.newY)
-                c.el.setAttribute('width', c.newW)
-                c.el.setAttribute('height', c.newH)
-              }
-            })
-            updateTransformHandles()
-          },
-        })
+        history.commit('变换元素')
       }
     }
 
@@ -1236,53 +1202,14 @@ export function select(svg, onSelectionChangeCallback) {
       if (selectedElements.length === 0) return
 
       const elementsToRemove = [...selectedElements]
-      // Record the state before removing
-      const parentsInfo = elementsToRemove.map((el) => {
-        return {
-          parent: el.parentNode || svg,
-          nextSibling: el.nextSibling,
-        }
-      })
 
-      // Remove from DOM
       elementsToRemove.forEach((el) => {
         if (el.parentNode) {
           el.parentNode.removeChild(el)
         }
       })
 
-      history.push({
-        desc: '删除元素',
-        undo: () => {
-          elementsToRemove.forEach((el, i) => {
-            const info = parentsInfo[i]
-            try {
-              if (info.parent) {
-                // If nextSibling is still valid and in the same parent
-                if (info.nextSibling && info.nextSibling.parentNode === info.parent) {
-                  info.parent.insertBefore(el, info.nextSibling)
-                } else {
-                  // Fallback to appendChild on parent
-                  info.parent.appendChild(el)
-                }
-              } else {
-                // Ultimate fallback
-                svg.appendChild(el)
-              }
-            } catch (err) {
-              console.error("Failed to restore element during undo", err)
-              svg.appendChild(el)
-            }
-          })
-        },
-        redo: () => {
-          elementsToRemove.forEach((el) => {
-            if (el.parentNode) {
-              el.parentNode.removeChild(el)
-            }
-          })
-        },
-      })
+      history.commit('删除元素')
 
       selectedElements = []
       updateTransformHandles()
@@ -1311,18 +1238,7 @@ export function select(svg, onSelectionChangeCallback) {
       const centerY = minY + (maxY - minY) / 2
 
       setClipboard({
-        elements: selectedElements.map((el) => {
-          const attrs = {}
-          for (let i = 0; i < el.attributes.length; i++) {
-            const attr = el.attributes[i]
-            attrs[attr.name] = attr.value
-          }
-          return {
-            tagName: el.tagName,
-            attributes: attrs,
-            innerHTML: el.innerHTML,
-          }
-        }),
+        elements: selectedElements.map((el) => serializeElementForClipboard(el)),
         centerX,
         centerY,
       })
@@ -1331,6 +1247,11 @@ export function select(svg, onSelectionChangeCallback) {
 
     // Paste: Ctrl+V logic removed from here as it is now handled globally
   }
+
+  const restoreCleanup = history.onRestore(() => {
+    selectedElements = []
+    updateTransformHandles()
+  })
 
   const listeners = createListenerManager();
   listeners.on(svg, 'mousedown', onMouseDown);
@@ -1341,6 +1262,7 @@ export function select(svg, onSelectionChangeCallback) {
   return () => {
     isActive = false
     console.log('Select tool deactivated')
+    restoreCleanup()
     observer.disconnect()
     listeners.dispose()
     if (transformGroup && transformGroup.parentNode) transformGroup.parentNode.removeChild(transformGroup)

@@ -66,48 +66,19 @@ function startEditing(textNode, isNew = false) {
         if (!currentInput) return;
 
         const newValue = input.value;
-        const textNodeRef = textNode;
 
         if (newValue.trim() !== "") {
             textNode.textContent = newValue;
             textNode.style.visibility = "visible";
-
             if (isNewText) {
-
-                history.push({
-                    desc: '创建文本',
-                    undo: () => textNodeRef.remove(),
-                    redo: () => svgElement.appendChild(textNodeRef)
-                });
+                history.commit('创建文本');
             } else if (newValue !== initialContent) {
-
-                const oldContent = initialContent;
-                const newContent = newValue;
-                history.push({
-                    desc: '编辑文本',
-                    undo: () => { textNodeRef.textContent = oldContent; },
-                    redo: () => { textNodeRef.textContent = newContent; }
-                });
+                history.commit('编辑文本');
             }
         } else {
-
             textNode.remove();
-
             if (!isNewText) {
-
-                const oldContent = initialContent;
-
-
-
-                history.push({
-                    desc: '删除文本',
-                    undo: () => {
-                        textNodeRef.textContent = oldContent;
-                        textNodeRef.style.visibility = "visible";
-                        svgElement.appendChild(textNodeRef);
-                    },
-                    redo: () => textNodeRef.remove()
-                });
+                history.commit('删除文本');
             }
         }
 

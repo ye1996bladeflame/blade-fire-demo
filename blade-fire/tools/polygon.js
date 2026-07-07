@@ -272,24 +272,7 @@ export function polygon(svg, onSelectionChangeCallback) {
         activePath.setAttribute("fill", "transparent");
 
         const path = activePath;
-        history.push({
-            desc: "创建多边形",
-            undo: () => {
-                if (path && path.parentNode) {
-                    path.remove();
-                }
-                if (editingPath === path) {
-                    exitEditMode();
-                }
-            },
-            redo: () => {
-                let rd = path.getAttribute("d");
-                if (!rd.match(/Z\s*$/i)) rd += " Z";
-                path.setAttribute("d", rd);
-                path.setAttribute("fill", "transparent");
-                svg.appendChild(path);
-            },
-        });
+        history.commit("创建多边形");
 
         resetState(false);
         enterEditMode(path);
@@ -352,19 +335,7 @@ export function polygon(svg, onSelectionChangeCallback) {
         const newD = editingPath.getAttribute("d");
         const oldD = buildPathData(dragInitPoints);
         if (newD !== oldD) {
-            history.push({
-                desc: "调整多边形顶点",
-                undo: () => {
-                    editingPath.setAttribute("d", oldD);
-                    createEditHandles();
-                    notifySelection();
-                },
-                redo: () => {
-                    editingPath.setAttribute("d", newD);
-                    createEditHandles();
-                    notifySelection();
-                },
-            });
+            history.commit("调整多边形顶点");
         }
 
         isDraggingVertex = false;
@@ -572,6 +543,21 @@ export function polygon(svg, onSelectionChangeCallback) {
         }
     }
 
+    const restoreCleanup = history.onRestore(() => {
+        if (editingPath) {
+            const uid = editingPath.getAttribute("uid");
+            const el = svg.querySelector(`[uid="${uid}"]`);
+            if (el && isClosedPolygonPath(el)) {
+                editingPath = el;
+                editingPath.setAttribute("data-polygon-editing", "true");
+                createEditHandles();
+                notifySelection();
+            } else {
+                exitEditMode();
+            }
+        }
+    });
+
     const listeners = createListenerManager();
     listeners.on(svg, "mousedown", onMouseDown);
     listeners.on(svg, "mousemove", onMouseMove);
@@ -583,6 +569,7 @@ export function polygon(svg, onSelectionChangeCallback) {
 
     return () => {
         listeners.dispose();
+        restoreCleanup();
 
         if (activePath) {
             resetState();

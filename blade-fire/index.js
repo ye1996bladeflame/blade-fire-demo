@@ -1,4 +1,4 @@
-import { createGrid, enableZoom, history, getClipboard, parseTransform, getMousePosition, createShape, setToolStyle, setGlobalStyle, createListenerManager } from "./common/index.js";
+import { createGrid, enableZoom, history, getClipboard, getMousePosition, createShape, setToolStyle, setGlobalStyle, createListenerManager, pasteFromClipboard } from "./common/index.js";
 import { circle } from "./tools/circle.js";
 import { rect } from "./tools/rect.js";
 import { triangle } from "./tools/triangle.js";
@@ -117,58 +117,11 @@ class BladeFire {
                     const clipboard = getClipboard();
                     if (!clipboard || !clipboard.elements.length) return;
 
-                    // Calculate offset
                     const offsetX = lastMousePos.x - clipboard.centerX;
                     const offsetY = lastMousePos.y - clipboard.centerY;
 
-                    const newElements = [];
-                    const svgNS = "http://www.w3.org/2000/svg";
-
-                    clipboard.elements.forEach(item => {
-                        const newEl = document.createElementNS(svgNS, item.tagName);
-
-                        // Copy attributes
-                        Object.keys(item.attributes).forEach(key => {
-                            newEl.setAttribute(key, item.attributes[key]);
-                        });
-
-                        if (item.innerHTML) {
-                            newEl.innerHTML = item.innerHTML;
-                        }
-
-                        // Adjust position
-                        const transform = newEl.getAttribute("transform") || "";
-                        const tData = parseTransform(transform);
-
-                        tData.tx += offsetX;
-                        tData.ty += offsetY;
-
-                        let tStr = `translate(${tData.tx}, ${tData.ty})`;
-                        if (tData.rotate) {
-                            tStr += ` rotate(${tData.rotate}, ${tData.cx}, ${tData.cy})`;
-                        }
-                        if (tData.sx !== 1 || tData.sy !== 1) {
-                            tStr += ` scale(${tData.sx}, ${tData.sy})`;
-                        }
-
-                        newEl.setAttribute("transform", tStr);
-
-                        svg.appendChild(newEl);
-                        newElements.push(newEl);
-                    });
-
-                    // Add to history
-                    history.push({
-                        desc: '粘贴元素',
-                        undo: () => {
-                            newElements.forEach(el => {
-                                if (el.parentNode) el.parentNode.removeChild(el);
-                            });
-                        },
-                        redo: () => {
-                            newElements.forEach(el => svg.appendChild(el));
-                        }
-                    });
+                    pasteFromClipboard(svg, clipboard, offsetX, offsetY);
+                    history.commit('粘贴元素');
 
                     e.preventDefault();
                 }
@@ -177,6 +130,7 @@ class BladeFire {
 
 
             this.svg = svg;
+            history.bind(svg);
 
             return {
                 svg,

@@ -65,12 +65,7 @@ function onMouseUp(evt) {
              const rx = parseFloat(currentCircle.getAttribute("rx"));
              const ry = parseFloat(currentCircle.getAttribute("ry"));
              if (rx > 0 && ry > 0) {
-                 const circle = currentCircle;
-                 history.push({
-                     desc: '创建圆形',
-                     undo: () => circle.remove(),
-                     redo: () => svgElement.appendChild(circle)
-                 });
+                 history.commit('创建圆形');
              } else {
                  currentCircle.remove();
              }

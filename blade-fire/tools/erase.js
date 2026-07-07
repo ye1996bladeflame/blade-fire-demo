@@ -300,28 +300,7 @@ function applyEraser(points) {
             }
         });
 
-        history.push({
-            desc: '橡皮擦擦除多边形',
-            undo: () => {
-                modifications.forEach(mod => {
-                    mod.element.setAttribute("d", mod.oldD);
-                    mod.element.style.display = "";
-                    if (mod.addedElements) {
-                        mod.addedElements.forEach(el => el.remove());
-                    }
-                });
-            },
-            redo: () => {
-                modifications.forEach(mod => {
-                    if (mod.action === 'remove') {
-                        mod.element.style.display = "none";
-                    } else if (mod.action === 'modify') {
-                        mod.element.setAttribute("d", mod.newD);
-                        mod.addedElements.forEach(el => svgElement.appendChild(el));
-                    }
-                });
-            }
-        });
+        history.commit('橡皮擦擦除多边形');
     }
 }
 

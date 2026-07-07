@@ -51,12 +51,7 @@ function onMouseUp(evt) {
              pathData += " Z";
              currentPath.setAttribute("d", pathData);
 
-             const path = currentPath;
-             history.push({
-                 desc: '手绘多边形',
-                 undo: () => path.remove(),
-                 redo: () => svgElement.appendChild(path)
-             });
+             history.commit('手绘多边形');
         }
         currentPath = null;
         pathData = "";
