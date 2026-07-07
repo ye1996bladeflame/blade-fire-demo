@@ -1,4 +1,6 @@
 
+import { createListenerManager } from '../common/index.js';
+
 export function createCrosshair(container) {
     // Create elements
     const hLine = document.createElement('div');
@@ -60,8 +62,9 @@ export function createCrosshair(container) {
         vLine.style.display = 'none';
     };
 
-    container.addEventListener('mousemove', onMouseMove);
-    container.addEventListener('mouseleave', onMouseLeave);
+    const listeners = createListenerManager();
+    listeners.on(container, 'mousemove', onMouseMove);
+    listeners.on(container, 'mouseleave', onMouseLeave);
 
     return {
         enable: () => {
@@ -73,8 +76,7 @@ export function createCrosshair(container) {
             vLine.style.display = 'none';
         },
         destroy: () => {
-            container.removeEventListener('mousemove', onMouseMove);
-            container.removeEventListener('mouseleave', onMouseLeave);
+            listeners.dispose();
             if (hLine.parentNode) hLine.parentNode.removeChild(hLine);
             if (vLine.parentNode) vLine.parentNode.removeChild(vLine);
         }

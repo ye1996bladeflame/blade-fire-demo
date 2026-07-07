@@ -1,4 +1,4 @@
-import { setCursor, history, createShape, getToolStyle, parseTransform } from "../common/index.js";
+import { setCursor, history, createShape, getToolStyle, parseTransform, createListenerManager } from "../common/index.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -572,22 +572,17 @@ export function polygon(svg, onSelectionChangeCallback) {
         }
     }
 
-    svg.addEventListener("mousedown", onMouseDown);
-    svg.addEventListener("mousemove", onMouseMove);
-    svg.addEventListener("dblclick", onDblClick);
-    svg.addEventListener("contextmenu", onContextMenu);
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onVertexDragUp);
-    window.addEventListener("keydown", onKeyDown, true);
+    const listeners = createListenerManager();
+    listeners.on(svg, "mousedown", onMouseDown);
+    listeners.on(svg, "mousemove", onMouseMove);
+    listeners.on(svg, "dblclick", onDblClick);
+    listeners.on(svg, "contextmenu", onContextMenu);
+    listeners.on(window, "mousemove", onMouseMove);
+    listeners.on(window, "mouseup", onVertexDragUp);
+    listeners.on(window, "keydown", onKeyDown, { capture: true });
 
     return () => {
-        svg.removeEventListener("mousedown", onMouseDown);
-        svg.removeEventListener("mousemove", onMouseMove);
-        svg.removeEventListener("dblclick", onDblClick);
-        svg.removeEventListener("contextmenu", onContextMenu);
-        window.removeEventListener("mousemove", onMouseMove);
-        window.removeEventListener("mouseup", onVertexDragUp);
-        window.removeEventListener("keydown", onKeyDown, true);
+        listeners.dispose();
 
         if (activePath) {
             resetState();

@@ -1,9 +1,10 @@
-import { setCursor, history, createShape, getToolStyle } from "../common/index.js";
+import { setCursor, history, createShape, getToolStyle, createListenerManager } from "../common/index.js";
 
 let isDrawing = false;
 let currentPath = null;
 let svgElement = null;
 let pathData = "";
+const listeners = createListenerManager();
 
 function getMousePosition(evt) {
     if (!svgElement) return { x: 0, y: 0 };
@@ -74,13 +75,12 @@ export function freehand(svg) {
 
     setCursor(svgElement, "crosshair");
     
-    svgElement.addEventListener("mousedown", onMouseDown);
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
+    listeners.activate();
+    listeners.on(svgElement, "mousedown", onMouseDown);
+    listeners.on(window, "mousemove", onMouseMove);
+    listeners.on(window, "mouseup", onMouseUp);
 
     return () => {
-        svgElement.removeEventListener("mousedown", onMouseDown);
-        window.removeEventListener("mousemove", onMouseMove);
-        window.removeEventListener("mouseup", onMouseUp);
+        listeners.dispose();
     };
 }

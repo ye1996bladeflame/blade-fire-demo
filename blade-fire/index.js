@@ -1,4 +1,4 @@
-import { createGrid, enableZoom, history, getClipboard, parseTransform, getMousePosition, createShape, setToolStyle, setGlobalStyle } from "./common/index.js";
+import { createGrid, enableZoom, history, getClipboard, parseTransform, getMousePosition, createShape, setToolStyle, setGlobalStyle, createListenerManager } from "./common/index.js";
 import { circle } from "./tools/circle.js";
 import { rect } from "./tools/rect.js";
 import { triangle } from "./tools/triangle.js";
@@ -87,13 +87,15 @@ class BladeFire {
             }
 
 
-            enablePan(svg);
+            const disablePan = enablePan(svg);
+
+            const listeners = createListenerManager();
 
             let lastMousePos = { x: 0, y: 0 };
             const onMouseMove = (evt) => {
                 lastMousePos = getMousePosition(svg, evt);
             };
-            window.addEventListener("mousemove", onMouseMove);
+            listeners.on(window, "mousemove", onMouseMove);
 
 
             const onKeyDown = (e) => {
@@ -171,7 +173,7 @@ class BladeFire {
                     e.preventDefault();
                 }
             };
-            window.addEventListener("keydown", onKeyDown);
+            listeners.on(window, "keydown", onKeyDown);
 
 
             this.svg = svg;
@@ -179,9 +181,8 @@ class BladeFire {
             return {
                 svg,
                 destroy: () => {
-                    window.removeEventListener("mousemove", onMouseMove);
-                    window.removeEventListener("keydown", onKeyDown);
-                    // Also clean up features if needed
+                    listeners.dispose();
+                    disablePan?.();
                 }
             };
         }

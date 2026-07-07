@@ -1,7 +1,8 @@
-import { setCursor, history, createShape, getToolStyle } from "../common/index.js";
+import { setCursor, history, createShape, getToolStyle, createListenerManager } from "../common/index.js";
 
 let svgElement = null;
 let currentInput = null;
+const listeners = createListenerManager();
 
 function getMousePosition(evt) {
     if (!svgElement) return { x: 0, y: 0 };
@@ -175,14 +176,11 @@ export function text(svg) {
 
     setCursor(svgElement, "text");
 
-
-    svgElement.removeEventListener("mousedown", onMouseDown);
-
-
-    svgElement.addEventListener("mousedown", onMouseDown);
+    listeners.activate();
+    listeners.on(svgElement, "mousedown", onMouseDown);
 
     return () => {
-        svgElement.removeEventListener("mousedown", onMouseDown);
+        listeners.dispose();
         if (currentInput) {
             currentInput.blur();
         }

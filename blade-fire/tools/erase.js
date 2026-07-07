@@ -1,4 +1,4 @@
-import { history, createShape } from "../common/index.js";
+import { history, createShape, createListenerManager } from "../common/index.js";
 import polygonClipping from 'polygon-clipping';
 
 const ERASER_RADIUS = 10;
@@ -7,6 +7,7 @@ let eraserPath = null;
 let svgElement = null;
 let points = [];
 let pathData = "";
+const listeners = createListenerManager();
 
 function getMousePosition(evt) {
     if (!svgElement) return { x: 0, y: 0 };
@@ -333,14 +334,13 @@ export function erase(svg) {
 
     setCursor(svgElement, cursorUrl);
 
-    svgElement.addEventListener("mousedown", onMouseDown);
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
+    listeners.activate();
+    listeners.on(svgElement, "mousedown", onMouseDown);
+    listeners.on(window, "mousemove", onMouseMove);
+    listeners.on(window, "mouseup", onMouseUp);
 
     return () => {
-        svgElement.removeEventListener("mousedown", onMouseDown);
-        window.removeEventListener("mousemove", onMouseMove);
-        window.removeEventListener("mouseup", onMouseUp);
+        listeners.dispose();
         setCursor(svgElement, "default"); // 恢复默认鼠标指针
         if (eraserPath) {
             eraserPath.remove();

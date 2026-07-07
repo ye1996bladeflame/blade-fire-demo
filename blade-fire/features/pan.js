@@ -1,4 +1,4 @@
-import { setCursor, refreshGrid } from "../common/index.js";
+import { setCursor, refreshGrid, createListenerManager } from "../common/index.js";
 
 export function enablePan(svg) {
     let isDragging = false;
@@ -62,15 +62,12 @@ export function enablePan(svg) {
         }
     }
 
-    // Attach listeners
-    svg.addEventListener("mousedown", onMouseDown);
-    window.addEventListener("mousemove", onMouseMove); // Window to catch drag outside
-    window.addEventListener("mouseup", onMouseUp);
+    const listeners = createListenerManager();
+    listeners.on(svg, "mousedown", onMouseDown);
+    listeners.on(window, "mousemove", onMouseMove);
+    listeners.on(window, "mouseup", onMouseUp);
 
-    // Return cleanup function
     return () => {
-        svg.removeEventListener("mousedown", onMouseDown);
-        window.removeEventListener("mousemove", onMouseMove);
-        window.removeEventListener("mouseup", onMouseUp);
+        listeners.dispose();
     };
 }

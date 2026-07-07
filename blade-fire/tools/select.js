@@ -1,4 +1,4 @@
-import { setCursor, history, setClipboard, getClipboard, parseTransform, getMousePosition as getMousePositionCommon } from '../common/index.js'
+import { setCursor, history, setClipboard, getClipboard, parseTransform, getMousePosition as getMousePositionCommon, createListenerManager } from '../common/index.js'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
 
@@ -1332,19 +1332,17 @@ export function select(svg, onSelectionChangeCallback) {
     // Paste: Ctrl+V logic removed from here as it is now handled globally
   }
 
-  svg.addEventListener('mousedown', onMouseDown)
-  window.addEventListener('mousemove', onMouseMove)
-  window.addEventListener('mouseup', onMouseUp)
-  window.addEventListener('keydown', onKeyDown)
+  const listeners = createListenerManager();
+  listeners.on(svg, 'mousedown', onMouseDown);
+  listeners.on(window, 'mousemove', onMouseMove);
+  listeners.on(window, 'mouseup', onMouseUp);
+  listeners.on(window, 'keydown', onKeyDown);
 
   return () => {
     isActive = false
     console.log('Select tool deactivated')
     observer.disconnect()
-    svg.removeEventListener('mousedown', onMouseDown)
-    window.removeEventListener('mousemove', onMouseMove)
-    window.removeEventListener('mouseup', onMouseUp)
-    window.removeEventListener('keydown', onKeyDown)
+    listeners.dispose()
     if (transformGroup && transformGroup.parentNode) transformGroup.parentNode.removeChild(transformGroup)
     if (selectionRect && selectionRect.parentNode) selectionRect.parentNode.removeChild(selectionRect)
   }

@@ -1,9 +1,10 @@
-import { setCursor, history, createShape, getToolStyle } from "../common/index.js";
+import { setCursor, history, createShape, getToolStyle, createListenerManager } from "../common/index.js";
 
 let isDrawing = false;
 let startX, startY;
 let currentCircle = null;
 let svgElement = null;
+const listeners = createListenerManager();
 
 function getMousePosition(evt) {
     if (!svgElement) return { x: 0, y: 0 };
@@ -92,21 +93,13 @@ export function circle(svg) {
     
     setCursor(svgElement, "crosshair");
 
-    
-    svgElement.removeEventListener("mousedown", onMouseDown);
-    svgElement.removeEventListener("mousemove", onMouseMove);
-    svgElement.removeEventListener("mouseup", onMouseUp);
+    listeners.activate();
+    listeners.on(svgElement, "mousedown", onMouseDown);
+    listeners.on(svgElement, "mousemove", onMouseMove);
+    listeners.on(svgElement, "mouseup", onMouseUp);
 
-    
-    svgElement.addEventListener("mousedown", onMouseDown);
-    svgElement.addEventListener("mousemove", onMouseMove);
-    svgElement.addEventListener("mouseup", onMouseUp);
-
-    
     return () => {
-        svgElement.removeEventListener("mousedown", onMouseDown);
-        svgElement.removeEventListener("mousemove", onMouseMove);
-        svgElement.removeEventListener("mouseup", onMouseUp);
+        listeners.dispose();
         console.log("Deactivate circle tool");
     };
 }
