@@ -4,6 +4,15 @@ import { SVG_NS, generateUID } from './element.js';
 /** @typedef {{ order: string[], shapes: Map<string, ShapeRecord> }} SceneSnapshot */
 /** @typedef {{ before: Map<string, ShapeRecord | null>, after: Map<string, ShapeRecord | null>, orderBefore?: string[], orderAfter?: string[] }} ScenePatch */
 
+function _hasClass(el, className) {
+  // classList.contains 在 SVG 元素上可能有兼容性问题，用 getAttribute 兜底
+  try {
+    if (el.classList?.contains(className)) return true;
+  } catch (_) { /* ignore */ }
+  const cls = el.getAttribute('class');
+  return cls ? cls.split(/\s+/).includes(className) : false;
+}
+
 export function isContentNode(el) {
   if (!el || el.nodeType !== 1) return false;
   const tag = el.tagName.toLowerCase();
@@ -12,8 +21,8 @@ export function isContentNode(el) {
   if (el.getAttribute('data-is-grid') === 'true') return false;
   if (el.getAttribute('data-is-eraser') === 'true') return false;
   if (el.getAttribute('data-ephemeral') === 'true') return false;
-  if (el.classList?.contains('grid-rect')) return false;
-  if (el.classList?.contains('polygon-edit-handles')) return false;
+  if (_hasClass(el, 'grid-rect')) return false;
+  if (_hasClass(el, 'polygon-edit-handles')) return false;
   const uid = el.getAttribute('uid');
   if (!uid) return false;
   return true;

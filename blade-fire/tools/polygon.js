@@ -1,58 +1,33 @@
-import { setCursor, history, createShape, getToolStyle, parseTransform, createListenerManager } from "../common/index.js";
+import { setCursor, history, undoRedoManager, createShape, getToolStyle, parseTransform, createListenerManager, parsePathData, buildPathData, isClosedPolygonPath } from "../common/index.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
-function parsePathData(d) {
-    if (!d) return [];
-    const points = [];
-    const commands = d.match(/[MmLlHhVv][^MmLlHhVv]*/g) || [];
-    let currentPos = { x: 0, y: 0 };
-    commands.forEach((cmdStr) => {
-        const type = cmdStr[0];
-        const args = cmdStr.slice(1).trim().split(/[\s,]+/).map(parseFloat).filter((n) => !isNaN(n));
-        if (type === "M" || type === "L") {
-            for (let i = 0; i < args.length; i += 2) {
-                currentPos = { x: args[i], y: args[i + 1] };
-                points.push(currentPos);
-            }
-        } else if (type === "m" || type === "l") {
-            for (let i = 0; i < args.length; i += 2) {
-                currentPos.x += args[i];
-                currentPos.y += args[i + 1];
-                points.push({ ...currentPos });
-            }
-        }
-    });
-    const finalPoints = [];
-    const uniquePoints = new Set();
-    for (const p of points) {
-        const key = `${p.x},${p.y}`;
-        if (!uniquePoints.has(key)) {
-            uniquePoints.add(key);
-            finalPoints.push(p);
-        }
-    }
-    if (finalPoints.length > 2) {
-        const first = finalPoints[0];
-        const last = finalPoints[finalPoints.length - 1];
-        if (first.x === last.x && first.y === last.y) {
-            finalPoints.pop();
-        }
-    }
-    return finalPoints;
-}
+// 模块级回调：由 polygon() 闭包设置，用于 undo/redo 后重建编辑手柄等视觉状态
+let _onPolygonRestore = null;
 
-function buildPathData(points) {
-    if (!points || points.length === 0) return "";
-    const d = points.map((p, i) => (i === 0 ? "M" : "L") + ` ${p.x} ${p.y}`).join(" ");
-    return d + " Z";
-}
-
-function isClosedPolygonPath(el) {
-    if (!el || el.tagName !== "path") return false;
-    const d = el.getAttribute("d");
-    return d && /Z\s*$/i.test(d.trim());
-}
+// 向 undoRedoManager 注册 polygon 的 onRestore 钩子（持久存在，不随工具切换注销）
+// 核心的逐点撤销/重做由 undoRedoManager 内置处理，这里仅负责视觉恢复
+undoRedoManager.register("polygon", {
+    onRestore(cmd, svg) {
+        if (!svg) return;
+        // 基本清理
+        svg.querySelectorAll('g.polygon-edit-handles').forEach(el => el.remove());
+        // 如果 polygon 工具激活，委托给闭包创建编辑手柄
+        if (_onPolygonRestore) {
+            _onPolygonRestore(cmd, svg);
+            return;
+        }
+        // polygon 工具未激活 → 最小化：设置 data-polygon-editing
+        const uid = cmd.relatedUids?.[0];
+        if (uid) {
+            const el = svg.querySelector(`[uid="${uid}"]`);
+            if (el && isClosedPolygonPath(el)) {
+                svg.querySelectorAll('[data-polygon-editing="true"]').forEach(e => e.removeAttribute('data-polygon-editing'));
+                el.setAttribute("data-polygon-editing", "true");
+            }
+        }
+    },
+});
 
 export function polygon(svg, onSelectionChangeCallback) {
     console.log("Polygon tool activated");
@@ -272,9 +247,13 @@ export function polygon(svg, onSelectionChangeCallback) {
         activePath.setAttribute("fill", "transparent");
 
         const path = activePath;
-        history.commit("创建多边形");
+        const uid = path.getAttribute("uid");
 
+        // 先清理临时绘制元素（guideLine、startPointMarker 等都有 uid，
+        // 会被 captureScene 捕获），再 commit，确保快照干净
         resetState(false);
+        history.commit("创建多边形", { shapeType: "polygon", relatedUids: [uid] });
+
         enterEditMode(path);
     }
 
@@ -335,7 +314,7 @@ export function polygon(svg, onSelectionChangeCallback) {
         const newD = editingPath.getAttribute("d");
         const oldD = buildPathData(dragInitPoints);
         if (newD !== oldD) {
-            history.commit("调整多边形顶点");
+            history.commit("调整多边形顶点", { shapeType: "polygon", relatedUids: [editingPath.getAttribute("uid")] });
         }
 
         isDraggingVertex = false;
@@ -396,6 +375,10 @@ export function polygon(svg, onSelectionChangeCallback) {
         }
 
         points.push(pos);
+        // 清除过时的 redo 状态（用户已在撤销后修改路径）
+        if (activePath) {
+            undoRedoManager.clearPolygonRedoState(activePath.getAttribute("uid"));
+        }
 
         if (points.length === 1) {
             activePath = createShape("path", {
@@ -523,27 +506,45 @@ export function polygon(svg, onSelectionChangeCallback) {
         return false;
     }
 
-    function onKeyDown(evt) {
-        if ((evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase() === "z" && !evt.shiftKey) {
-            if (activePath && points.length > 0) {
-                points.pop();
-                if (points.length < 2) {
-                    resetState();
-                } else {
-                    updatePath();
-                    if (guideLine) {
-                        const lastPoint = points[points.length - 1];
-                        guideLine.setAttribute("x1", lastPoint.x);
-                        guideLine.setAttribute("y1", lastPoint.y);
-                    }
-                }
-                evt.stopPropagation();
-                evt.preventDefault();
+    // ---- 绘制/编辑模式切换 ----
+
+    function switchToDrawMode(vertexPoints, path) {
+        // 从编辑模式切换回绘制模式，使用已有的 path 和顶点
+        exitEditMode();
+        const newD = vertexPoints.map((p, i) => (i === 0 ? "M" : "L") + ` ${p.x} ${p.y}`).join(" ");
+        path.setAttribute("d", newD);
+        path.setAttribute("fill", "none");
+
+        points = vertexPoints;
+        activePath = path;
+
+        const lastPoint = points[points.length - 1];
+        toolGroup = createShape("g", { "pointer-events": "none" });
+        svg.appendChild(toolGroup);
+        startPointMarker = createShape("circle", {
+            cx: points[0].x, cy: points[0].y, r: 5,
+            fill: "rgba(0, 255, 0, 0.5)", stroke: "green",
+            "pointer-events": "all", cursor: "pointer",
+        });
+        svg.appendChild(startPointMarker);
+        guideLine = createShape("line", {
+            x1: lastPoint.x, y1: lastPoint.y,
+            x2: lastPoint.x, y2: lastPoint.y,
+            stroke: "green", "stroke-width": "1", "stroke-dasharray": "5,5",
+        });
+        toolGroup.appendChild(guideLine);
+        viewChangeObserver = new MutationObserver(() => {
+            if (snapIndicator) {
+                snapIndicator.setAttribute("r", 5 / (svg.getScreenCTM().a || 1));
+                snapIndicator.setAttribute("stroke-width", 2 / (svg.getScreenCTM().a || 1));
             }
-        }
+        });
+        viewChangeObserver.observe(svg, { attributes: true, attributeFilter: ["viewBox", "width", "height"] });
     }
 
-    const restoreCleanup = history.onRestore(() => {
+    // ---- undo/redo 闭包处理器（仅用于 onRestore 时创建编辑手柄） ----
+
+    _onPolygonRestore = (cmd, svg) => {
         if (editingPath) {
             const uid = editingPath.getAttribute("uid");
             const el = svg.querySelector(`[uid="${uid}"]`);
@@ -555,8 +556,145 @@ export function polygon(svg, onSelectionChangeCallback) {
             } else {
                 exitEditMode();
             }
+            return;
         }
-    });
+        if (!activePath && !points.length) {
+            const el = svg.querySelector('[data-polygon-editing="true"]');
+            if (el && isClosedPolygonPath(el)) {
+                editingPath = el;
+                createEditHandles();
+                notifySelection();
+            }
+        }
+    };
+
+    // ---- 键盘事件（统一处理所有逐点撤销/重做） ----
+    // 注册在 document 捕获阶段，确保先于全局 window 上的 keydown 触发
+    // 编辑模式：委托 undoRedoManager.undo/redo 处理核心逻辑，仅做视觉反馈
+    // 绘制模式：本地弹出/恢复顶点（无 history commit），redo 状态通过 pushPolygonRedoPoint 管理
+    // 无本地状态：仍尝试 undoRedoManager 处理任意多边形的逐点撤销并进入绘制模式
+
+    function onKeyDown(evt) {
+        const isCtrlZ = (evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase() === "z";
+        if (!isCtrlZ) return;
+
+        const isRedo = evt.shiftKey;
+
+        // ── Ctrl+Shift+Z: 逐点重做 ──
+        if (isRedo) {
+            const result = undoRedoManager.redo(svg);
+            if (result?.type === "polygon-redo") {
+                const { uid, newPoints, closed } = result;
+                if (closed) {
+                    // 所有点已恢复且已闭合 → 进入编辑模式
+                    const path = svg.querySelector(`[uid="${uid}"]`);
+                    if (path && isClosedPolygonPath(path)) {
+                        if (activePath) resetState(false);
+                        enterEditMode(path);
+                    }
+                } else if (activePath && activePath.getAttribute("uid") === uid) {
+                    // 在绘制模式中且是同一多边形 → 同步本地状态和引导线
+                    points = newPoints;
+                    updatePath();
+                    if (guideLine) {
+                        const lastPoint = points[points.length - 1];
+                        guideLine.setAttribute("x1", lastPoint.x);
+                        guideLine.setAttribute("y1", lastPoint.y);
+                        guideLine.setAttribute("x2", lastPoint.x);
+                        guideLine.setAttribute("y2", lastPoint.y);
+                    }
+                } else if (newPoints.length > 0) {
+                    // 不在绘制模式或不是同一多边形 → 切换到该多边形的绘制模式
+                    const path = svg.querySelector(`[uid="${uid}"]`);
+                    if (path) {
+                        exitEditMode();
+                        if (activePath) resetState(true);
+                        switchToDrawMode(newPoints, path);
+                    }
+                }
+                evt.stopImmediatePropagation();
+                evt.preventDefault();
+                return;
+            }
+            // 非 polygon 重做 → 放行给全局 handler
+            return;
+        }
+
+        // ── Ctrl+Z: 编辑模式逐点撤销 → 委托 undoRedoManager ──
+        if (editingPath) {
+            const editingUid = editingPath.getAttribute("uid");
+            const result = undoRedoManager.undo(svg, editingUid);
+            if (result?.type === "polygon-undo") {
+                const path = svg.querySelector(`[uid="${result.uid}"]`) || editingPath;
+                if (result.remainingPoints.length > 0) {
+                    switchToDrawMode(result.remainingPoints, path);
+                } else {
+                    exitEditMode();
+                    if (path && path.parentNode) path.remove();
+                }
+                evt.stopImmediatePropagation();
+                evt.preventDefault();
+                return;
+            }
+            if (result === true) {
+                exitEditMode();
+                evt.stopImmediatePropagation();
+                evt.preventDefault();
+                return;
+            }
+        }
+
+        // ── Ctrl+Z: 绘制模式逐点撤销（无 history commit，本地处理） ──
+        if (activePath && points.length > 0) {
+            const uid = activePath.getAttribute("uid");
+            const popped = points[points.length - 1];
+            points.pop();
+
+            // 存储到 undoRedoManager 的 LIFO redo 状态
+            undoRedoManager.pushPolygonRedoPoint(uid, popped);
+
+            if (points.length === 0) {
+                activePath.setAttribute("d", "");
+                resetState(false);
+            } else {
+                updatePath();
+                if (guideLine) {
+                    const lastPoint = points[points.length - 1];
+                    guideLine.setAttribute("x1", lastPoint.x);
+                    guideLine.setAttribute("y1", lastPoint.y);
+                    guideLine.setAttribute("x2", lastPoint.x);
+                    guideLine.setAttribute("y2", lastPoint.y);
+                }
+            }
+            evt.stopImmediatePropagation();
+            evt.preventDefault();
+            return;
+        }
+
+        // ── Ctrl+Z: 无本地状态时仍尝试 undoRedoManager（处理其他已提交的多边形）──
+        // 例如：绘制模式撤销完所有顶点后，继续 Ctrl+Z 应撤销上一个已闭合的多边形
+        {
+            const result = undoRedoManager.undo(svg);
+            if (result?.type === "polygon-undo") {
+                const path = svg.querySelector(`[uid="${result.uid}"]`);
+                if (path && result.remainingPoints.length > 0) {
+                    switchToDrawMode(result.remainingPoints, path);
+                }
+                evt.stopImmediatePropagation();
+                evt.preventDefault();
+                return;
+            }
+            if (result === true) {
+                evt.stopImmediatePropagation();
+                evt.preventDefault();
+                return;
+            }
+        }
+
+        // 非 polygon 相关操作 → 放行给全局 handler
+    }
+
+    // ---- 事件绑定 ----
 
     const listeners = createListenerManager();
     listeners.on(svg, "mousedown", onMouseDown);
@@ -565,16 +703,31 @@ export function polygon(svg, onSelectionChangeCallback) {
     listeners.on(svg, "contextmenu", onContextMenu);
     listeners.on(window, "mousemove", onMouseMove);
     listeners.on(window, "mouseup", onVertexDragUp);
-    listeners.on(window, "keydown", onKeyDown, { capture: true });
+    // 必须在 document 捕获阶段注册，确保在全局 window keydown（冒泡阶段）之前触发
+    // 否则 window 上的 handler 注册顺序会导致全局先触发 → undoRedoManager → 重复弹点
+    listeners.on(document, "keydown", onKeyDown, { capture: true });
 
     return () => {
         listeners.dispose();
-        restoreCleanup();
+        _onPolygonRestore = null;
 
         if (activePath) {
             resetState();
         }
         exitEditMode();
+
+        // 断开 viewChangeObserver（兜底，避免 activePath 为 null 时未清理）
+        if (viewChangeObserver) {
+            viewChangeObserver.disconnect();
+            viewChangeObserver = null;
+        }
+
+        // 强制清理残留的编辑状态 DOM（兜底，确保切换工具后不留痕迹）
+        svg.querySelectorAll('[data-polygon-editing="true"]').forEach(el => {
+            el.removeAttribute('data-polygon-editing');
+        });
+        svg.querySelectorAll('g.polygon-edit-handles').forEach(el => el.remove());
+
         console.log("Deactivate polygon tool");
     };
 }

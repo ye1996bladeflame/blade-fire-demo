@@ -1121,7 +1121,7 @@ export function select(svg, onSelectionChangeCallback) {
       })
 
       if (changes.length > 0) {
-        history.commit('变换元素')
+        history.commit('变换元素', { shapeType: 'transform', relatedUids: selectedElements.map(el => el.getAttribute('uid')) })
       }
     }
 
@@ -1209,7 +1209,7 @@ export function select(svg, onSelectionChangeCallback) {
         }
       })
 
-      history.commit('删除元素')
+      history.commit('删除元素', { shapeType: 'delete' })
 
       selectedElements = []
       updateTransformHandles()
@@ -1248,7 +1248,7 @@ export function select(svg, onSelectionChangeCallback) {
     // Paste: Ctrl+V logic removed from here as it is now handled globally
   }
 
-  const restoreCleanup = history.onRestore(() => {
+  const restoreCleanup = history.onRestore((cmd) => {
     selectedElements = []
     updateTransformHandles()
   })

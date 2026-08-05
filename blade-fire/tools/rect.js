@@ -64,7 +64,7 @@ function onMouseUp(evt) {
              const width = parseFloat(currentRect.getAttribute("width"));
              const height = parseFloat(currentRect.getAttribute("height"));
              if (width > 0 && height > 0) {
-                 history.commit('创建矩形');
+                 history.commit('创建矩形', { shapeType: 'rect', relatedUids: [currentRect.getAttribute('uid')] });
              } else {
                  currentRect.remove();
              }

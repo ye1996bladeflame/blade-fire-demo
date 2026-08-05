@@ -1,4 +1,4 @@
-import { createGrid, enableZoom, history, getClipboard, getMousePosition, createShape, setToolStyle, setGlobalStyle, createListenerManager, pasteFromClipboard } from "./common/index.js";
+import { createGrid, enableZoom, history, undoRedoManager, getClipboard, getMousePosition, createShape, setToolStyle, setGlobalStyle, createListenerManager, pasteFromClipboard } from "./common/index.js";
 import { circle } from "./tools/circle.js";
 import { rect } from "./tools/rect.js";
 import { triangle } from "./tools/triangle.js";
@@ -24,6 +24,15 @@ class BladeFire {
 
     static onHistoryChange(callback) {
         return history.subscribe(callback);
+    }
+
+    /**
+     * 注册 undo/redo 恢复后的工具切换回调。
+     * 当撤销/重做恢复一个图形时，会通知 UI 切换到 select 工具以显示选中状态。
+     */
+    static onUndoRedoRestore(callback) {
+        undoRedoManager.setToolChangeCallback(callback);
+        return () => undoRedoManager.setToolChangeCallback(null);
     }
 
     static clearHistory() {
@@ -104,14 +113,14 @@ class BladeFire {
 
                 if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
                     if (e.shiftKey) {
-                        history.redo();
+                        undoRedoManager.redo(this.svg);
                         e.preventDefault();
                     } else {
-                        history.undo();
+                        undoRedoManager.undo(this.svg);
                         e.preventDefault();
                     }
                 } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
-                    history.redo();
+                    undoRedoManager.redo(this.svg);
                     e.preventDefault();
                 } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
                     const clipboard = getClipboard();
@@ -121,12 +130,16 @@ class BladeFire {
                     const offsetY = lastMousePos.y - clipboard.centerY;
 
                     pasteFromClipboard(svg, clipboard, offsetX, offsetY);
-                    history.commit('粘贴元素');
+                    history.commit('粘贴元素', { shapeType: 'paste' });
 
                     e.preventDefault();
                 }
             };
             listeners.on(window, "keydown", onKeyDown);
+
+            // 统一的 undo/redo 恢复回调
+            undoRedoManager.setSelectionCallback((elements) => this.notifySelectionChange(elements));
+            history.onRestore((cmd) => undoRedoManager.onRestore(cmd, this.svg));
 
 
             this.svg = svg;

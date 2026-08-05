@@ -129,6 +129,7 @@ const historyLog = ref([])
 let activeToolCleanup = null
 let selectionCleanup = null
 let historyCleanup = null
+let undoRedoCleanup = null
 let bladeFireCleanup = null
 let bladeFireInstance = null
 
@@ -160,6 +161,14 @@ const initCanvas = () => {
   if (historyCleanup) historyCleanup()
   historyCleanup = BladeFire.onHistoryChange((stack) => {
     historyLog.value = [...stack]
+  })
+
+  if (undoRedoCleanup) undoRedoCleanup()
+  undoRedoCleanup = BladeFire.onUndoRedoRestore((shapeType, tagName) => {
+    // 撤销/重做恢复图形后，切换到 select 工具以显示选中状态
+    if (currentTool.value !== 'select') {
+      selectTool('select')
+    }
   })
 
   // Restore current tool if any
@@ -239,6 +248,7 @@ onMounted(() => {
 onUnmounted(() => {
   if (selectionCleanup) selectionCleanup()
   if (historyCleanup) historyCleanup()
+  if (undoRedoCleanup) undoRedoCleanup()
   if (bladeFireCleanup) bladeFireCleanup()
 })
 </script>

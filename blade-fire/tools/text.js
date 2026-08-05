@@ -71,14 +71,14 @@ function startEditing(textNode, isNew = false) {
             textNode.textContent = newValue;
             textNode.style.visibility = "visible";
             if (isNewText) {
-                history.commit('创建文本');
+                history.commit('创建文本', { shapeType: 'text', relatedUids: [textNode.getAttribute('uid')] });
             } else if (newValue !== initialContent) {
-                history.commit('编辑文本');
+                history.commit('编辑文本', { shapeType: 'text', relatedUids: [textNode.getAttribute('uid')] });
             }
         } else {
             textNode.remove();
             if (!isNewText) {
-                history.commit('删除文本');
+                history.commit('删除文本', { shapeType: 'text', relatedUids: [textNode.getAttribute('uid')] });
             }
         }
 

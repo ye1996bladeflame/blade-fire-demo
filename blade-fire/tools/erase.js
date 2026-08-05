@@ -300,7 +300,7 @@ function applyEraser(points) {
             }
         });
 
-        history.commit('橡皮擦擦除多边形');
+        history.commit('橡皮擦擦除多边形', { shapeType: 'erase' });
     }
 }
 

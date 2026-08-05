@@ -65,7 +65,7 @@ function onMouseUp(evt) {
              const rx = parseFloat(currentCircle.getAttribute("rx"));
              const ry = parseFloat(currentCircle.getAttribute("ry"));
              if (rx > 0 && ry > 0) {
-                 history.commit('创建圆形');
+                 history.commit('创建圆形', { shapeType: 'circle', relatedUids: [currentCircle.getAttribute('uid')] });
              } else {
                  currentCircle.remove();
              }

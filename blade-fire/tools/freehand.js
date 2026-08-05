@@ -51,7 +51,7 @@ function onMouseUp(evt) {
              pathData += " Z";
              currentPath.setAttribute("d", pathData);
 
-             history.commit('手绘多边形');
+             history.commit('手绘多边形', { shapeType: 'freehand', relatedUids: [currentPath.getAttribute('uid')] });
         }
         currentPath = null;
         pathData = "";

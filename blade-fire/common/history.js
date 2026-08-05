@@ -63,14 +63,16 @@ export class History {
     this.listeners.forEach((l) => l(this.undoStack));
   }
 
-  notifyRestore() {
-    this.restoreListeners.forEach((l) => l());
+  notifyRestore(cmd) {
+    this.restoreListeners.forEach((l) => l(cmd));
   }
 
   /** @returns {HistoryCommand} */
-  _createCommand(desc, patch) {
+  _createCommand(desc, patch, meta) {
     return {
       desc,
+      shapeType: meta?.shapeType || null,
+      relatedUids: meta?.relatedUids || null,
       before: patch.before,
       after: patch.after,
       orderBefore: patch.orderBefore,
@@ -92,8 +94,10 @@ export class History {
 
   /**
    * 提交一条命令：自动 diff 当前 DOM 与 baseline，仅存储变更部分的局部快照。
+   * @param {string} desc 操作描述
+   * @param {{ shapeType?: string, relatedUids?: string[] }} [meta] 元数据
    */
-  commit(desc) {
+  commit(desc, meta) {
     if (!this.svg) {
       console.warn('History: svg not bound, call history.bind(svg) first');
       return;
@@ -102,7 +106,7 @@ export class History {
     const patch = computePatch(this.baseline, next);
     if (isPatchEmpty(patch)) return;
 
-    this.undoStack.push(this._createCommand(desc, patch));
+    this.undoStack.push(this._createCommand(desc, patch, meta));
     this.redoStack = [];
     this.baseline = next;
     this.notify();
@@ -123,7 +127,7 @@ export class History {
         orderAfter: action.orderAfter,
       };
       if (isPatchEmpty(patch) && !action.force) return;
-      this.undoStack.push(this._createCommand(action.desc || '操作', patch));
+      this.undoStack.push(this._createCommand(action.desc || '操作', patch, action.meta));
       this.redoStack = [];
       this.baseline = captureScene(this.svg, this.baseline);
       this.notify();
@@ -131,7 +135,7 @@ export class History {
     }
 
     if (action.redo) action.redo();
-    this.commit(action.desc || '操作');
+    this.commit(action.desc || '操作', action.meta);
   }
 
   undo() {
@@ -141,7 +145,7 @@ export class History {
     const cmd = this.undoStack.pop();
     this.redoStack.push(cmd);
     this._applyUndo(cmd);
-    this.notifyRestore();
+    this.notifyRestore(cmd);
     this.notify();
   }
 
@@ -152,8 +156,18 @@ export class History {
     const cmd = this.redoStack.pop();
     this.undoStack.push(cmd);
     this._applyRedo(cmd);
-    this.notifyRestore();
+    this.notifyRestore(cmd);
     this.notify();
+  }
+
+  /**
+   * 同步 baseline 到当前 DOM 状态。
+   * 当 handler 直接操作 DOM（绕过 history.undo/redo）时调用，
+   * 确保后续 commit 的 diff 基于正确的基准。
+   */
+  syncBaseline() {
+    if (!this.svg) return;
+    this.baseline = captureScene(this.svg, this.baseline);
   }
 
   clear() {
@@ -164,7 +178,7 @@ export class History {
       const empty = { order: [], shapes: new Map() };
       applyScene(this.svg, empty);
       this.baseline = empty;
-      this.notifyRestore();
+      this.notifyRestore(null);
     } else {
       this.baseline = null;
     }

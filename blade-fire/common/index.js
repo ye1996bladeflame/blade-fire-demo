@@ -144,11 +144,13 @@ export function getOverlayLayer(svg) {
   return svg;
 }
 export { history } from './history.js';
+export { undoRedoManager } from './undo-redo.js';
 export { captureScene, applyScene, applyPartial, computePatch, isContentNode } from './scene.js';
 export { parseTransform } from './transform.js';
 export { serializeElementForClipboard, pasteFromClipboard } from './clipboard.js';
 export { createShape, SVG_NS, getToolStyle, setToolStyle, setGlobalStyle, generateUID } from './element.js';
 export { createListenerManager } from './listeners.js';
+export { parsePathData, buildPathData, isClosedPolygonPath } from './path-utils.js';
 
 let clipboard = null;
 export function setClipboard(data) {

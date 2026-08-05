@@ -70,7 +70,7 @@ function onMouseUp(evt) {
         if (currentTriangle) {
              const bbox = currentTriangle.getBBox();
              if (bbox.width > 0 && bbox.height > 0) {
-                 history.commit('创建三角形');
+                 history.commit('创建三角形', { shapeType: 'triangle', relatedUids: [currentTriangle.getAttribute('uid')] });
              } else {
                  currentTriangle.remove();
              }
