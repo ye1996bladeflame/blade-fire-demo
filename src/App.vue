@@ -165,8 +165,12 @@ const initCanvas = () => {
 
   if (undoRedoCleanup) undoRedoCleanup()
   undoRedoCleanup = BladeFire.onUndoRedoRestore((shapeType, tagName) => {
-    // 撤销/重做恢复图形后，切换到 select 工具以显示选中状态
-    if (currentTool.value !== 'select') {
+    // 撤销/重做恢复图形后，根据图形类型切换到对应工具
+    if (shapeType === 'polygon') {
+      if (currentTool.value !== 'polygon') {
+        selectTool('polygon')
+      }
+    } else if (currentTool.value !== 'select') {
       selectTool('select')
     }
   })

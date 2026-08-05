@@ -82,7 +82,8 @@ class UndoRedoManager {
     if (!path) return null;
 
     const vertexPoints = parsePathData(path.getAttribute('d'));
-    if (vertexPoints.length < 3) return null; // 回退给 history.undo() 整图删除
+    // d 中已无任何顶点（如历史遗留的空 path）→ 交 history.undo() 做整图回退删除
+    if (vertexPoints.length === 0) return null;
 
     const popped = vertexPoints.pop();
     const newD = vertexPoints.map((p, i) => (i === 0 ? 'M' : 'L') + ` ${p.x} ${p.y}`).join(' ');
@@ -96,7 +97,9 @@ class UndoRedoManager {
     // 存储 redo 状态（LIFO）
     this.pushPolygonRedoPoint(uid, popped);
 
-    // 从 undoStack 移除该 commit
+    // 弹出顶点后将该命令视为已消费，从 undoStack 移除。
+    // 剩余顶点的连续撤销由 polygon 工具在绘制模式下本地处理（不再重复弹此命令），
+    // 直到最后一个顶点也被撤销时由 polygon 工具删除 path。
     for (let i = history.undoStack.length - 1; i >= 0; i--) {
       if (history.undoStack[i] === cmd) { history.undoStack.splice(i, 1); break; }
     }

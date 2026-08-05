@@ -655,7 +655,12 @@ export function polygon(svg, onSelectionChangeCallback) {
 
             if (points.length === 0) {
                 activePath.setAttribute("d", "");
+                const emptyPath = activePath;
                 resetState(false);
+                // d 已无数据，清理残留的空 path 元素
+                if (emptyPath && emptyPath.parentNode) {
+                    emptyPath.parentNode.removeChild(emptyPath);
+                }
             } else {
                 updatePath();
                 if (guideLine) {
@@ -679,6 +684,8 @@ export function polygon(svg, onSelectionChangeCallback) {
                 const path = svg.querySelector(`[uid="${result.uid}"]`);
                 if (path && result.remainingPoints.length > 0) {
                     switchToDrawMode(result.remainingPoints, path);
+                } else if (path) {
+                    path.remove();
                 }
                 evt.stopImmediatePropagation();
                 evt.preventDefault();
@@ -706,6 +713,12 @@ export function polygon(svg, onSelectionChangeCallback) {
     // 必须在 document 捕获阶段注册，确保在全局 window keydown（冒泡阶段）之前触发
     // 否则 window 上的 handler 注册顺序会导致全局先触发 → undoRedoManager → 重复弹点
     listeners.on(document, "keydown", onKeyDown, { capture: true });
+
+    // 激活时自动检测需要编辑的闭合多边形（如 undo/redo 切换工具后）
+    const editingEl = svg.querySelector('[data-polygon-editing="true"]');
+    if (editingEl && isClosedPolygonPath(editingEl)) {
+        enterEditMode(editingEl);
+    }
 
     return () => {
         listeners.dispose();
