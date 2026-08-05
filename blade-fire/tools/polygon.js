@@ -249,6 +249,9 @@ export function polygon(svg, onSelectionChangeCallback) {
         const path = activePath;
         const uid = path.getAttribute("uid");
 
+        // 闭合是一个新的提交点，清除该多边形的逐点重做状态（含撤销闭合的 unclosed 标记）
+        undoRedoManager.clearPolygonRedoState(uid);
+
         // 先清理临时绘制元素（guideLine、startPointMarker 等都有 uid，
         // 会被 captureScene 捕获），再 commit，确保快照干净
         resetState(false);

@@ -15,7 +15,7 @@ class UndoRedoManager {
     this._handlers = new Map();
     this._onSelectionChange = null;
     this._onToolChange = null;
-    /** 多边形逐点重做状态：uid -> { poppedPoints: Point[] } */
+    /** 多边形逐点重做状态：uid -> { poppedPoints: Point[], unclosed?: boolean } */
     this._polygonRedoState = new Map();
     /** LIFO 重做顺序：记录 uid 的撤销先后顺序，最后撤销的最先重做 */
     this._polygonRedoOrder = [];
@@ -81,7 +81,34 @@ class UndoRedoManager {
     const path = svg?.querySelector(`[uid="${uid}"]`);
     if (!path) return null;
 
-    const vertexPoints = parsePathData(path.getAttribute('d'));
+    const dVal = path.getAttribute('d');
+
+    // 闭合状态下第一次撤销：只撤销"闭合"产生的最后一条边（去掉 Z，保留全部顶点）
+    if (isClosedPolygonPath(path)) {
+      const newD = dVal.replace(/Z\s*$/i, '').trim();
+      path.setAttribute('d', newD);
+      path.setAttribute('fill', 'none');
+      path.removeAttribute('data-polygon-editing');
+      svg.querySelectorAll('g.polygon-edit-handles').forEach(el => el.remove());
+
+      // 记录"待重新闭合"的重做状态（本次撤销不弹顶点）
+      let state = this._polygonRedoState.get(uid);
+      if (!state) {
+        state = { poppedPoints: [] };
+        this._polygonRedoState.set(uid, state);
+      }
+      state.unclosed = true;
+      const idx = this._polygonRedoOrder.indexOf(uid);
+      if (idx !== -1) this._polygonRedoOrder.splice(idx, 1);
+      this._polygonRedoOrder.push(uid);
+
+      this._consumeUndoCmd(cmd);
+      history.syncBaseline();
+      history.notify();
+      return { uid, remainingPoints: parsePathData(newD) };
+    }
+
+    const vertexPoints = parsePathData(dVal);
     // d 中已无任何顶点（如历史遗留的空 path）→ 交 history.undo() 做整图回退删除
     if (vertexPoints.length === 0) return null;
 
@@ -100,13 +127,18 @@ class UndoRedoManager {
     // 弹出顶点后将该命令视为已消费，从 undoStack 移除。
     // 剩余顶点的连续撤销由 polygon 工具在绘制模式下本地处理（不再重复弹此命令），
     // 直到最后一个顶点也被撤销时由 polygon 工具删除 path。
-    for (let i = history.undoStack.length - 1; i >= 0; i--) {
-      if (history.undoStack[i] === cmd) { history.undoStack.splice(i, 1); break; }
-    }
+    this._consumeUndoCmd(cmd);
 
     history.syncBaseline();
     history.notify();
     return { uid, remainingPoints: vertexPoints };
+  }
+
+  /** 将已通过逐点/去闭合方式消费的"创建多边形"命令从 undoStack 移除 */
+  _consumeUndoCmd(cmd) {
+    for (let i = history.undoStack.length - 1; i >= 0; i--) {
+      if (history.undoStack[i] === cmd) { history.undoStack.splice(i, 1); break; }
+    }
   }
 
   // ---- 多边形逐点重做 ----
@@ -120,7 +152,7 @@ class UndoRedoManager {
     while (this._polygonRedoOrder.length > 0) {
       const uid = this._polygonRedoOrder[this._polygonRedoOrder.length - 1];
       const state = this._polygonRedoState.get(uid);
-      if (!state || state.poppedPoints.length === 0) {
+      if (!state || (state.poppedPoints.length === 0 && !state.unclosed)) {
         this._polygonRedoOrder.pop();
         this._polygonRedoState.delete(uid);
         continue;
@@ -139,28 +171,46 @@ class UndoRedoManager {
         svg.appendChild(path);
       }
 
-      const popped = state.poppedPoints.pop();
-      const currentPoints = parsePathData(path.getAttribute('d') || '');
-      currentPoints.push(popped);
+      // 先恢复被撤销的顶点
+      if (state.poppedPoints.length > 0) {
+        const popped = state.poppedPoints.pop();
+        const currentPoints = parsePathData(path.getAttribute('d') || '');
+        currentPoints.push(popped);
 
-      const newD = currentPoints.map((p, i) => (i === 0 ? 'M' : 'L') + ` ${p.x} ${p.y}`).join(' ');
-      const closed = state.poppedPoints.length === 0;
+        const newD = currentPoints.map((p, i) => (i === 0 ? 'M' : 'L') + ` ${p.x} ${p.y}`).join(' ');
+        const allRestored = state.poppedPoints.length === 0;
 
-      if (closed) {
-        path.setAttribute('d', newD + ' Z');
+        if (allRestored && !state.unclosed) {
+          // 所有点已恢复且无"待闭合"记录 → 直接闭合并重新提交
+          path.setAttribute('d', newD + ' Z');
+          path.setAttribute('fill', 'transparent');
+          path.setAttribute('data-polygon-editing', 'true');
+          history.commit('创建多边形', { shapeType: 'polygon', relatedUids: [uid] });
+          this._polygonRedoOrder.pop();
+          this._polygonRedoState.delete(uid);
+        } else {
+          // 尚未全部恢复，或还需在最后恢复闭合 → 保持开放折线
+          path.setAttribute('d', newD);
+          path.setAttribute('fill', 'none');
+          history.syncBaseline();
+        }
+
+        history.notify();
+        return { uid, newPoints: currentPoints, closed: allRestored && !state.unclosed };
+      }
+
+      // 顶点全部恢复后，若有"待闭合"记录 → 最后恢复闭合（对应撤销闭合操作）
+      if (state.unclosed) {
+        const dVal = (path.getAttribute('d') || '').replace(/Z\s*$/i, '').trim();
+        path.setAttribute('d', dVal + ' Z');
         path.setAttribute('fill', 'transparent');
         path.setAttribute('data-polygon-editing', 'true');
         history.commit('创建多边形', { shapeType: 'polygon', relatedUids: [uid] });
         this._polygonRedoOrder.pop();
         this._polygonRedoState.delete(uid);
-      } else {
-        path.setAttribute('d', newD);
-        path.setAttribute('fill', 'none');
-        history.syncBaseline();
+        history.notify();
+        return { uid, newPoints: parsePathData(path.getAttribute('d')), closed: true };
       }
-
-      history.notify();
-      return { uid, newPoints: currentPoints, closed };
     }
     return null;
   }
