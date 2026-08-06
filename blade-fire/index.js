@@ -51,11 +51,14 @@ class BladeFire {
         const shape = createShape(tag, attrs);
         if (this.svg) {
             this.svg.appendChild(shape);
-            // history.push({
-            //     desc: '新增自定义图形',
-            //     undo: () => shape.remove(),
-            //     redo: () => this.svg.appendChild(shape)
-            // });
+            // 程序化导入的元素作为"原始数据"写入历史基线：
+            // 之后对它的移动/缩放/旋转，撤销时只回退变换，不会把元素本身删掉。
+            if (tag === 'image' && (attrs?.href || attrs?.src)) {
+                // 图片需要等加载 + 居中（异步）完成后再同步，否则基线缺少最终坐标
+                shape.addEventListener('blade-shape-ready', () => history.syncBaseline(), { once: true });
+            } else {
+                history.syncBaseline();
+            }
         } else {
             console.warn("BladeFire is not initialized");
         }
