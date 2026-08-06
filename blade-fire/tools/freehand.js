@@ -1,4 +1,5 @@
 import { setCursor, history, createShape, getToolStyle, createListenerManager } from "../common/index.js";
+import { clampPoint } from "../common/draw-area.js";
 
 let isDrawing = false;
 let currentPath = null;
@@ -10,10 +11,8 @@ function getMousePosition(evt) {
     if (!svgElement) return { x: 0, y: 0 };
     const CTM = svgElement.getScreenCTM();
     if (!CTM) return { x: 0, y: 0 };
-    return {
-        x: (evt.clientX - CTM.e) / CTM.a,
-        y: (evt.clientY - CTM.f) / CTM.d
-    };
+    // 绘制坐标限制在绘制区域内
+    return clampPoint(svgElement, (evt.clientX - CTM.e) / CTM.a, (evt.clientY - CTM.f) / CTM.d);
 }
 
 function onMouseDown(evt) {

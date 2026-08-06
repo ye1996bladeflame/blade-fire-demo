@@ -1,4 +1,5 @@
 import { setCursor, history, undoRedoManager, createShape, getToolStyle, parseTransform, createListenerManager, parsePathData, buildPathData, isClosedPolygonPath } from "../common/index.js";
+import { clampPoint } from "../common/draw-area.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -184,10 +185,8 @@ export function polygon(svg, onSelectionChangeCallback) {
 
     function getMousePos(evt) {
         const CTM = svg.getScreenCTM();
-        return {
-            x: (evt.clientX - CTM.e) / CTM.a,
-            y: (evt.clientY - CTM.f) / CTM.d,
-        };
+        // 绘制坐标限制在绘制区域内
+        return clampPoint(svg, (evt.clientX - CTM.e) / CTM.a, (evt.clientY - CTM.f) / CTM.d);
     }
 
     function updatePath() {

@@ -1,4 +1,5 @@
 import { setCursor, history, setClipboard, getClipboard, parseTransform, getMousePosition as getMousePositionCommon, createListenerManager, serializeElementForClipboard } from '../common/index.js'
+import { clampPoint, clampMove } from '../common/draw-area.js'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
 
@@ -492,7 +493,8 @@ export function select(svg, onSelectionChangeCallback) {
           initTransform: transform,
           tagName: el.tagName,
           initMatrix,
-          localBBox
+          localBBox,
+          startBounds: getElementGlobalBounds(el)
         },
       ]
     } else {
@@ -584,7 +586,7 @@ export function select(svg, onSelectionChangeCallback) {
       clearSelection()
     }
 
-    if (target !== svg && target.tagName !== 'defs' && target.getAttribute('data-is-grid') !== 'true' && !target.classList.contains('grid-rect')) {
+    if (target !== svg && target.tagName !== 'defs' && target.getAttribute('data-is-grid') !== 'true' && !target.classList.contains('grid-rect') && target.getAttribute('draw-area') !== 'true') {
       if (!selectedElements.includes(target)) {
         selectedElements.push(target)
         updateTransformHandles()
@@ -650,7 +652,9 @@ export function select(svg, onSelectionChangeCallback) {
       setCursor(svg, 'move')
       if (selectedElements.length === 1) {
         const s = elementStates[0]
-        const moveMatrix = svg.createSVGMatrix().translate(dx, dy);
+        // 移动限制在绘制区域内
+        const { dx: mdx, dy: mdy } = clampMove(svg, s.startBounds, dx, dy)
+        const moveMatrix = svg.createSVGMatrix().translate(mdx, mdy);
         const combinedMatrix = moveMatrix.multiply(s.initMatrix);
         const bboxCenterX = s.localBBox.x + s.localBBox.width / 2;
         const bboxCenterY = s.localBBox.y + s.localBBox.height / 2;
@@ -665,7 +669,9 @@ export function select(svg, onSelectionChangeCallback) {
             transformGroup.setAttribute('transform', `translate(${tData.tx}, ${tData.ty}) rotate(${tData.rotate}, ${tData.cx || 0}, ${tData.cy || 0})`)
         }
       } else {
-        const moveMatrix = svg.createSVGMatrix().translate(dx, dy);
+        // 多选移动限制在绘制区域内
+        const { dx: mdx, dy: mdy } = clampMove(svg, groupBounds, dx, dy)
+        const moveMatrix = svg.createSVGMatrix().translate(mdx, mdy);
         selectedElements.forEach((el, i) => {
           const s = elementStates[i]
           const combinedMatrix = moveMatrix.multiply(s.initMatrix);
@@ -673,7 +679,7 @@ export function select(svg, onSelectionChangeCallback) {
           const bboxCenterY = s.localBBox.y + s.localBBox.height / 2;
           el.setAttribute('transform', matrixToTransformString(combinedMatrix, bboxCenterX, bboxCenterY));
         })
-        transformGroup.setAttribute('transform', `translate(${dx}, ${dy})`)
+        transformGroup.setAttribute('transform', `translate(${mdx}, ${mdy})`)
       }
     } else if (dragMode === 'rotate') {
       if (selectedElements.length === 1) {
@@ -724,6 +730,10 @@ export function select(svg, onSelectionChangeCallback) {
         transformGroup.setAttribute('transform', `rotate(${angle}, ${cx}, ${cy})`)
       }
     } else if (dragMode === 'resize') {
+      // 缩放时拖拽点不超出绘制区域
+      const cpos = clampPoint(svg, pos.x, pos.y)
+      const dx = cpos.x - initialMouse.x
+      const dy = cpos.y - initialMouse.y
       if (selectedElements.length === 1) {
         let s = elementStates[0]
 
@@ -1141,7 +1151,7 @@ export function select(svg, onSelectionChangeCallback) {
 
       const children = Array.from(svg.children)
       for (let el of children) {
-        if (el.tagName === 'defs' || el.tagName === 'g' || el.tagName === 'foreignObject' || el.id === 'grid-background' || el.getAttribute('data-is-grid') === 'true') continue
+        if (el.tagName === 'defs' || el.tagName === 'g' || el.tagName === 'foreignObject' || el.id === 'grid-background' || el.getAttribute('data-is-grid') === 'true' || el.getAttribute('draw-area') === 'true') continue
 
         try {
           const bbox = getElementGlobalBounds(el)

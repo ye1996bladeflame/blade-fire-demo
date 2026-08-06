@@ -168,3 +168,7 @@ export function getMousePosition(svg, evt) {
         y: (evt.clientY - CTM.f) / CTM.d
     };
 }
+
+export { getDrawingArea, clampPoint, clampRect, clampMove } from './draw-area.js';
+// 兼容旧写法：clampToDrawingArea 等价于 clampPoint
+export { clampPoint as clampToDrawingArea } from './draw-area.js';
