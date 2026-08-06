@@ -4,19 +4,18 @@ import { clampPoint } from "../common/draw-area.js";
 /**
  * 旋转矩形工具。
  *
- * 交互流程（两个点 + 拖拽 + 点击提交）：
- *  1. 点击放置第一个点（边的起点）；
- *  2. 再点击放置第二个点（边的终点），形成第一条边；
- *  3. 按住鼠标拖拽，矩形沿边的单位法向量方向外扩（厚度 = 鼠标到边的垂直距离）；
- *  4. 松开后保留预览，再点击鼠标左键提交旋转矩形；
- *     若放置第二个点后未拖拽直接点击，同样以点击位置的外扩量立即提交。
- *  Escape 可逐级取消（拖拽 → 边 → 点）。
+ * 交互流程（两个点 + 移动鼠标拉出，与 OCR 工具一致）：
+ *  1. 左键点击放置第一个点（边的起点）；
+ *  2. 左键点击放置第二个点（边的终点），确定边后自动进入拉出状态（无需右键确认）；
+ *  3. 直接移动鼠标即可外扩（无需按住左键拖拽），矩形沿边的单位法向量方向外扩
+ *     （厚度 = 鼠标到边的垂直距离），预览实时跟随鼠标；
+ *  4. 松开左键即提交（点击或按住拖拽后松开均可），此期间按下不会再放置新的点。
+ *  Escape 可逐级取消（边 → 点）。
  *
  * 矩形以闭合 path 表示：边 + 边沿法向偏移后生成的四个顶点。
  */
 const MIN_EDGE_LENGTH = 3;    // 边的最小长度（SVG 单位），过短视为误操作
 const MIN_THICKNESS = 0.5;    // 外扩最小厚度，过薄视为退化矩形
-const CLICK_THRESHOLD = 4;    // 屏幕像素，位移小于该值视为"点击"而非"拖拽"
 
 export function rotateRect(svg) {
     console.log("RotateRect tool activated");
@@ -34,11 +33,9 @@ export function rotateRect(svg) {
     let guideLine = null;         // 第一个点到鼠标的边预览虚线
     let edgeCommitted = null;     // {x1, y1, x2, y2} 已确定的边
     let edgeLine = null;          // 已确定边的指示线
-    let isExtruding = false;      // 正在拖拽外扩
-    let rectPath = null;          // 拖拽中的矩形预览
+    let rectPath = null;          // 跟随鼠标的矩形预览
     let normal = null;            // {nx, ny} 边的单位法向量
     let offset = 0;               // 当前外扩量
-    let pressClient = null;       // 本次按下的屏幕坐标，用于区分点击/拖拽
 
     function getMousePosition(evt) {
         const CTM = svgElement.getScreenCTM();
@@ -151,7 +148,7 @@ export function rotateRect(svg) {
         normal = { nx: -dy / length, ny: dx / length };
         firstPoint = null;
 
-        // 显示已确定的边，提示用户下一步拖拽
+        // 显示已确定的边，提示用户下一步移动鼠标拉出矩形
         edgeLine = createShape("line", {
             x1: edgeCommitted.x1, y1: edgeCommitted.y1,
             x2: edgeCommitted.x2, y2: edgeCommitted.y2,
@@ -162,28 +159,9 @@ export function rotateRect(svg) {
         svgElement.appendChild(edgeLine);
     }
 
-    // ---- 第三步：拖拽外扩 ----
+    // ---- 第三步：移动鼠标外扩（无需按住左键） ----
 
-    function beginExtrude(pos) {
-        isExtruding = true;
-        offset = computeOffset(pos);
-        if (!rectPath) {
-            if (edgeLine) { edgeLine.remove(); edgeLine = null; }
-            rectPath = createShape("path", {
-                d: buildRectPathData(offset),
-                "stroke-linejoin": "round",
-                "stroke-linecap": "round",
-                ...getToolStyle("rotate-rect"),
-            });
-            svgElement.appendChild(rectPath);
-        }
-    }
-
-    // ---- 第四步：提交 / 取消 ----
-
-    function removeRectPreview() {
-        if (rectPath) { rectPath.remove(); rectPath = null; }
-        // 恢复边的指示线，允许重新拖拽
+    function restoreEdgeLine() {
         if (edgeCommitted && !edgeLine) {
             edgeLine = createShape("line", {
                 x1: edgeCommitted.x1, y1: edgeCommitted.y1,
@@ -196,17 +174,40 @@ export function rotateRect(svg) {
         }
     }
 
-    function commitRect() {
-        if (!rectPath) return;
+    function removeRectPreview() {
+        if (rectPath) { rectPath.remove(); rectPath = null; }
+        // 恢复边的指示线，允许继续拉出
+        restoreEdgeLine();
+    }
+
+    /** 根据鼠标位置更新外扩量并刷新矩形预览，预览随鼠标移动实时更新 */
+    function updateRectPreview(pos) {
+        offset = computeOffset(pos);
         if (Math.abs(offset) < MIN_THICKNESS) {
-            // 厚度过薄 → 不生成矩形
+            // 过薄 → 不显示矩形，恢复边指示线
             removeRectPreview();
             return;
         }
+        if (edgeLine) { edgeLine.remove(); edgeLine = null; }
+        if (!rectPath) {
+            rectPath = createShape("path", {
+                d: buildRectPathData(offset),
+                "stroke-linejoin": "round",
+                "stroke-linecap": "round",
+                ...getToolStyle("rotate-rect"),
+            });
+            svgElement.appendChild(rectPath);
+        } else {
+            rectPath.setAttribute("d", buildRectPathData(offset));
+        }
+    }
+
+    // ---- 第四步：提交 / 取消 ----
+
+    function commitRect() {
+        if (!rectPath) return;
         const path = rectPath;
         rectPath = null;
-        isExtruding = false;
-        pressClient = null;
         edgeCommitted = null;
         normal = null;
         offset = 0;
@@ -214,14 +215,8 @@ export function rotateRect(svg) {
         history.commit("创建旋转矩形", { shapeType: "rotate-rect", relatedUids: [path.getAttribute("uid")] });
     }
 
-    /** 逐级取消：拖拽 → 边 → 点 */
+    /** 逐级取消：边 → 点 */
     function cancelAll() {
-        if (isExtruding) {
-            isExtruding = false;
-            pressClient = null;
-            removeRectPreview();
-            return;
-        }
         if (edgeCommitted) {
             if (rectPath) { rectPath.remove(); rectPath = null; }
             if (edgeLine) { edgeLine.remove(); edgeLine = null; }
@@ -242,21 +237,12 @@ export function rotateRect(svg) {
     function onMouseDown(evt) {
         if (evt.button !== 0) return;
         const pos = getMousePosition(evt);
-        pressClient = { x: evt.clientX, y: evt.clientY };
-        if (isExtruding) return;
-        // 已有拖拽出的矩形预览 → 点击即提交（以拖拽确定的外扩量为准）
-        if (edgeCommitted && rectPath) {
-            commitRect();
-            evt.preventDefault();
-            return;
-        }
-        // 边已确定 → 开始拖拽外扩
+        // 边已确定：按下仅用于确认提交（提交在 mouseup 时进行），不得再放置新的点
         if (edgeCommitted) {
-            beginExtrude(pos);
             evt.preventDefault();
             return;
         }
-        // 已有第一个点 → 放置第二个点
+        // 已有第一个点 → 放置第二个点，确定边
         if (firstPoint) {
             placeSecondPoint(pos);
             evt.preventDefault();
@@ -268,34 +254,23 @@ export function rotateRect(svg) {
 
     function onMouseMove(evt) {
         const pos = getMousePosition(evt);
-        if (isExtruding) {
-            offset = computeOffset(pos);
-            rectPath.setAttribute("d", buildRectPathData(offset));
-            return;
-        }
+        // 放置第一个点后：边预览虚线跟随鼠标
         if (firstPoint && !edgeCommitted) {
             guideLine.setAttribute("x2", pos.x);
             guideLine.setAttribute("y2", pos.y);
+            return;
+        }
+        // 边已确定：直接移动鼠标即可拉出矩形，无需按住左键
+        if (edgeCommitted) {
+            updateRectPreview(pos);
         }
     }
 
     function onMouseUp(evt) {
         if (evt.button !== 0) return;
-        if (!isExtruding) return;
-        isExtruding = false;
-        const dist = pressClient
-            ? Math.hypot(evt.clientX - pressClient.x, evt.clientY - pressClient.y)
-            : 0;
-        pressClient = null;
-        if (dist < CLICK_THRESHOLD) {
-            // 无位移 → 视为点击，直接提交
-            commitRect();
-            return;
-        }
-        // 拖拽结束 → 保留预览，等待最终点击提交
-        if (Math.abs(offset) < MIN_THICKNESS) {
-            removeRectPreview();
-        }
+        if (!edgeCommitted) return;
+        // 松开即提交（点击或拖拽后松开均可）；无有效预览时 commitRect 内部直接返回
+        commitRect();
     }
 
     function onKeyDown(evt) {
@@ -322,8 +297,6 @@ export function rotateRect(svg) {
         edgeCommitted = null;
         normal = null;
         offset = 0;
-        isExtruding = false;
-        pressClient = null;
         console.log("Deactivate rotate-rect tool");
     };
 }
