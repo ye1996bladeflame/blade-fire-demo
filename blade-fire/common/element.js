@@ -15,7 +15,8 @@ let toolStyles = {
     polygon: {},
     triangle: {},
     rect: {},
-    "rotate-rect": {}
+    "rotate-rect": {},
+    point: { fill: "#12C785", stroke: "none", "stroke-width": "0" }
 };
 
 export function setGlobalStyle(style) {

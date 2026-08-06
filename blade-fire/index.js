@@ -8,8 +8,11 @@ import { triangle } from "./tools/triangle.js";
 import { polygon } from "./tools/polygon.js";
 import { text } from "./tools/text.js";
 import { select } from "./tools/select.js";
+import { box } from "./tools/box.js";
 import { freehand } from "./tools/freehand.js";
 import { erase } from "./tools/erase.js";
+import { point } from "./tools/point.js";
+import { ocr } from "./tools/ocr.js";
 import { enablePan } from "./features/pan.js";
 import { createRuler } from "./features/ruler.js";
 import { createCrosshair } from "./features/crosshair.js";
@@ -200,8 +203,17 @@ class BladeFire {
     static erase() {
         return erase(this.svg);
     }
+    static point() {
+        return point(this.svg);
+    }
+    static ocr() {
+        return ocr(this.svg, (elements) => this.notifySelectionChange(elements));
+    }
     static select() {
         return select(this.drawingLayer || this.svg, (elements) => this.notifySelectionChange(elements));
+    }
+    static box() {
+        return box(this.svg);
     }
 }
 

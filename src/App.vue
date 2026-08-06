@@ -85,6 +85,7 @@ const currentTool = ref('')
 // 绘制工具配置：key 需与 BladeFire 静态方法名一致
 const tools = [
   { key: 'select', title: '选择 (Select)', icon: '<path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"></path><path d="M13 13l6 6"></path>' },
+  { key: 'box', title: '框选 (Box)', icon: '<rect x="3" y="3" width="18" height="18" rx="1" stroke-dasharray="3 2"></rect>' },
   { key: 'circle', title: '圆形 (Circle)', icon: '<circle cx="12" cy="12" r="10"></circle>' },
   { key: 'rect', title: '矩形 (Rect)', icon: '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>' },
   { key: 'rotateRect', title: '旋转矩形 (Rotate Rect)', icon: '<rect x="6" y="6" width="12" height="12" rx="1" transform="rotate(20 12 12)"></rect>' },
@@ -92,7 +93,9 @@ const tools = [
   { key: 'triangle', title: '三角形 (Triangle)', icon: '<path d="M12 3l10 18H2L12 3z"></path>' },
   { key: 'polygon', title: '多边形 (Polygon)', icon: '<path d="M12 2l9 4.9V17L12 22l-9-4.9V7z"></path>' },
   { key: 'freehand', title: '手绘 (Freehand)', icon: '<path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path>' },
-  { key: 'pathEllipse', title: '路径椭圆 (Path Ellipse)', icon: '<ellipse cx="12" cy="12" rx="9" ry="6"></ellipse>' }
+  { key: 'pathEllipse', title: '路径椭圆 (Path Ellipse)', icon: '<ellipse cx="12" cy="12" rx="9" ry="6"></ellipse>' },
+  { key: 'point', title: '点标记 (Point)', icon: '<circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"></circle>' },
+  { key: 'ocr', title: 'OCR不规则图形 (OCR)', icon: '<path d="M4 19L3 8l6-4 8 2 3 7-5 6H4z"></path>' }
 ]
 
 const selectionInfo = ref([])
