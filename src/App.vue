@@ -14,52 +14,9 @@
 
         <div class="toolbar-title">绘制工具</div>
         <div class="tools-grid">
-          <a-tooltip title="选择 (Select)" placement="right">
-            <div class="tool-icon-btn" :class="{ active: currentTool === 'select' }" @click="selectTool('select')">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"></path>
-                <path d="M13 13l6 6"></path>
-              </svg>
-            </div>
-          </a-tooltip>
-
-          <a-tooltip title="圆形 (Circle)" placement="right">
-            <div class="tool-icon-btn" :class="{ active: currentTool === 'circle' }" @click="selectTool('circle')">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"></circle>
-              </svg>
-            </div>
-          </a-tooltip>
-
-          <a-tooltip title="矩形 (Rect)" placement="right">
-            <div class="tool-icon-btn" :class="{ active: currentTool === 'rect' }" @click="selectTool('rect')">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-              </svg>
-            </div>
-          </a-tooltip>
-
-          <a-tooltip title="三角形 (Triangle)" placement="right">
-            <div class="tool-icon-btn" :class="{ active: currentTool === 'triangle' }" @click="selectTool('triangle')">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 3l10 18H2L12 3z"></path>
-              </svg>
-            </div>
-          </a-tooltip>
-
-          <a-tooltip title="多边形 (Polygon)" placement="right">
-            <div class="tool-icon-btn" :class="{ active: currentTool === 'polygon' }" @click="selectTool('polygon')">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 2l9 4.9V17L12 22l-9-4.9V7z"></path>
-              </svg>
-            </div>
-          </a-tooltip>
-
-          <a-tooltip title="手绘 (Freehand)" placement="right">
-            <div class="tool-icon-btn" :class="{ active: currentTool === 'freehand' }" @click="selectTool('freehand')">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path>
-              </svg>
+          <a-tooltip v-for="tool in tools" :key="tool.key" :title="tool.title" placement="right">
+            <div class="tool-icon-btn" :class="{ active: currentTool === tool.key }" @click="selectTool(tool.key)">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" v-html="tool.icon"></svg>
             </div>
           </a-tooltip>
         </div>
@@ -124,6 +81,20 @@ const currentPageId = ref('page-1')
 let pageCounter = 1
 
 const currentTool = ref('')
+
+// 绘制工具配置：key 需与 BladeFire 静态方法名一致
+const tools = [
+  { key: 'select', title: '选择 (Select)', icon: '<path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"></path><path d="M13 13l6 6"></path>' },
+  { key: 'circle', title: '圆形 (Circle)', icon: '<circle cx="12" cy="12" r="10"></circle>' },
+  { key: 'rect', title: '矩形 (Rect)', icon: '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>' },
+  { key: 'rotateRect', title: '旋转矩形 (Rotate Rect)', icon: '<rect x="6" y="6" width="12" height="12" rx="1" transform="rotate(20 12 12)"></rect>' },
+  { key: 'path-rect', title: '路径矩形 (Path Rect)', icon: '<rect x="3" y="3" width="18" height="18" rx="1"></rect><circle cx="7" cy="17" r="2" fill="currentColor" stroke="none"></circle>' },
+  { key: 'triangle', title: '三角形 (Triangle)', icon: '<path d="M12 3l10 18H2L12 3z"></path>' },
+  { key: 'polygon', title: '多边形 (Polygon)', icon: '<path d="M12 2l9 4.9V17L12 22l-9-4.9V7z"></path>' },
+  { key: 'freehand', title: '手绘 (Freehand)', icon: '<path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path>' },
+  { key: 'pathEllipse', title: '路径椭圆 (Path Ellipse)', icon: '<ellipse cx="12" cy="12" rx="9" ry="6"></ellipse>' }
+]
+
 const selectionInfo = ref([])
 const historyLog = ref([])
 let activeToolCleanup = null

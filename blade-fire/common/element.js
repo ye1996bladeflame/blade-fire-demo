@@ -9,11 +9,13 @@ let globalShapeStyle = {
 let toolStyles = {
     circle: { fill: "rgba(255, 99, 71, 0.3)", stroke: "#FF6347" },
     ellipse: { fill: "rgba(255, 99, 71, 0.3)", stroke: "#FF6347" },
+    pathEllipse: {},
     text: { fill: "rgb(51, 51, 51)", stroke: "none", "stroke-width": "0" },
     freehand: { fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round" },
     polygon: {},
     triangle: {},
-    rect: {}
+    rect: {},
+    "rotate-rect": {}
 };
 
 export function setGlobalStyle(style) {

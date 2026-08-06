@@ -1,6 +1,9 @@
 import { createGrid, enableZoom, history, undoRedoManager, getClipboard, getMousePosition, createShape, setToolStyle, setGlobalStyle, createListenerManager, pasteFromClipboard } from "./common/index.js";
 import { circle } from "./tools/circle.js";
+import { pathEllipse } from "./tools/path-ellipse.js";
 import { rect } from "./tools/rect.js";
+import { rotateRect } from "./tools/rotate-rect.js";
+import { pathRect } from "./tools/path-rect.js";
 import { triangle } from "./tools/triangle.js";
 import { polygon } from "./tools/polygon.js";
 import { text } from "./tools/text.js";
@@ -170,8 +173,17 @@ class BladeFire {
     static circle() {
         return circle(this.svg);
     }
+    static pathEllipse() {
+        return pathEllipse(this.svg);
+    }
     static rect() {
         return rect(this.svg);
+    }
+    static rotateRect() {
+        return rotateRect(this.svg);
+    }
+    static "path-rect"() {
+        return pathRect(this.svg);
     }
     static triangle() {
         return triangle(this.svg);
