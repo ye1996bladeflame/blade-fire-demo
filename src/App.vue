@@ -16,7 +16,8 @@
         <div class="tools-grid">
           <a-tooltip v-for="tool in tools" :key="tool.key" :title="tool.title" placement="right">
             <div class="tool-icon-btn" :class="{ active: currentTool === tool.key }" @click="selectTool(tool.key)">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" v-html="tool.icon"></svg>
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" v-html="tool.icon"></svg>
             </div>
           </a-tooltip>
         </div>
@@ -25,7 +26,8 @@
         <div class="tools-grid">
           <a-tooltip title="多边形橡皮擦 (Eraser)" placement="right">
             <div class="tool-icon-btn" :class="{ active: currentTool === 'erase' }" @click="selectTool('erase')">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
                 <path d="M18 13l-5 5L3 8l5-5 10 10z"></path>
                 <path d="M13 18l5 5"></path>
               </svg>
@@ -40,25 +42,30 @@
 
     <a-layout-sider theme="light" width="300" class="right-sider">
       <div class="right-panel-content">
-        <a-card title="属性" size="small" :bordered="false" class="panel-card" :bodyStyle="{ flex: 1, overflowY: 'auto', minHeight: 0 }">
+        <a-card title="属性" size="small" :bordered="false" class="panel-card"
+          :bodyStyle="{ flex: 1, overflowY: 'auto', minHeight: 0 }">
           <a-empty v-if="selectionInfo.length === 0" description="未选中任何图形" :image="undefined" />
           <div v-else>
-            <a-descriptions v-for="(item, idx) in selectionInfo" :key="idx" :title="item.tagName" size="small" :column="1" bordered style="margin-bottom: 16px">
+            <a-descriptions v-for="(item, idx) in selectionInfo" :key="idx" :title="item.tagName" size="small"
+              :column="1" bordered style="margin-bottom: 16px">
               <a-descriptions-item label="X">{{ Math.round(item.x) }}</a-descriptions-item>
               <a-descriptions-item label="Y">{{ Math.round(item.y) }}</a-descriptions-item>
               <a-descriptions-item label="宽度">{{ Math.round(item.width) }}</a-descriptions-item>
               <a-descriptions-item label="高度">{{ Math.round(item.height) }}</a-descriptions-item>
-              <a-descriptions-item label="旋转">{{ ((Math.round(item.rotation || 0) % 360) + 360) % 360 }}°</a-descriptions-item>
+              <a-descriptions-item label="旋转">{{ ((Math.round(item.rotation || 0) % 360) + 360) % 360
+                }}°</a-descriptions-item>
             </a-descriptions>
           </div>
         </a-card>
 
         <a-divider style="margin: 0" />
 
-        <a-card title="历史消息" size="small" :bordered="false" class="panel-card" :bodyStyle="{ flex: 1, overflowY: 'auto', minHeight: 0 }">
+        <a-card title="历史消息" size="small" :bordered="false" class="panel-card"
+          :bodyStyle="{ flex: 1, overflowY: 'auto', minHeight: 0 }">
           <a-empty v-if="historyLog.length === 0" description="暂无历史记录" :image="undefined" />
           <div v-else class="history-list">
-            <a-card v-for="(item, index) in historyLog" :key="index" size="small" class="history-item-card" :bordered="false" :bodyStyle="{ padding: '8px 12px' }">
+            <a-card v-for="(item, index) in historyLog" :key="index" size="small" class="history-item-card"
+              :bordered="false" :bodyStyle="{ padding: '8px 12px' }">
               <div class="history-content">
                 <span class="history-index">#{{ index + 1 }}</span>
                 <span class="history-desc">{{ item.desc || '未知操作' }}</span>
@@ -122,7 +129,7 @@ const initCanvas = () => {
   historyLog.value = []
   selectionInfo.value = []
 
-  bladeFireInstance = BladeFire.init({ container: 'map-container', grid: true, gridSize: 40, zoom: true,ruler:true })
+  bladeFireInstance = BladeFire.init({ container: 'map-container', zoom: true })
   if (bladeFireInstance && bladeFireInstance.destroy) {
     bladeFireCleanup = bladeFireInstance.destroy
   }
@@ -152,16 +159,16 @@ const initCanvas = () => {
     href: 'https://gips2.baidu.com/it/u=195724436,3554684702&fm=3028&app=3028&f=JPEG&fmt=auto?w=1280&h=960',
     'draw-area': true
   })
-  BladeFire.createShape('rect', {
-    x: 120,
-    y: 120,
-    width: 300,
-    height: 300,
-    fill: 'rgba(255, 0, 0, 0.5)',
-    stroke: 'red',
-    'stroke-width': '1',
-    uid:'666666'
-  })
+  // BladeFire.createShape('rect', {
+  //   x: 120,
+  //   y: 120,
+  //   width: 300,
+  //   height: 300,
+  //   fill: 'rgba(255, 0, 0, 0.5)',
+  //   stroke: 'red',
+  //   'stroke-width': '1',
+  //   uid: '666666'
+  // })
   // BladeFire.createShape('circle', {
   //   cx: 240,
   //   cy: 240,
@@ -171,13 +178,13 @@ const initCanvas = () => {
   //   'stroke-width': '1',
   //   uid:'777777'
   // })
-  // BladeFire.createShape('path', {
-  //   d: 'M 120 120 L 240 240 L 11 240 L 44 120 L Z',
-  //   fill: '#00ff0080',
-  //   stroke: '#00ff0080',
-  //   'stroke-width': '1',
-  //   uid:'888888'
-  // })
+  BladeFire.createShape('path', {
+    d: 'M 200 200 L 240 240 L 11 240 L 44 120 L Z',
+    fill: '#00ff0080',
+    stroke: '#00ff0080',
+    'stroke-width': '1',
+    uid:'888888'
+  })
 }
 
 const addPage = () => {

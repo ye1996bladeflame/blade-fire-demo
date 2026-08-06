@@ -1,5 +1,5 @@
 import { setCursor, history, setClipboard, getClipboard, parseTransform, getMousePosition as getMousePositionCommon, createListenerManager, serializeElementForClipboard } from '../common/index.js'
-import { clampPoint, clampMove } from '../common/draw-area.js'
+import { clampPoint, clampMove, getDrawingArea } from '../common/draw-area.js'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
 
@@ -23,6 +23,11 @@ export function select(svg, onSelectionChangeCallback) {
   let elementStates = []
   let groupBounds = null
   let resizeHandle = null
+
+  // 旋转拖动状态：累计旋转角。鼠标角度增量归一化后累加，
+  // 保证跨 atan2 ±180° 边界时角度连续不跳变，旋转被钳制后图形能稳稳停住
+  let lastRotRawAngle = null
+  let accumRot = 0
 
   function notifySelectionChange() {
     if (onSelectionChangeCallback) {
@@ -52,6 +57,14 @@ export function select(svg, onSelectionChangeCallback) {
       x: cx + dx * cos - dy * sin,
       y: cy + dx * sin + dy * cos,
     }
+  }
+
+  // 把角度增量归一化到 [-180, 180]，用于累计旋转角时保证角度连续
+  function normalizeAngleDelta(d) {
+    d = d % 360
+    if (d > 180) d -= 360
+    if (d < -180) d += 360
+    return d
   }
 
   function getMousePosition(evt) {
@@ -166,6 +179,80 @@ export function select(svg, onSelectionChangeCallback) {
       console.error('Failed to get element bounds:', e)
       return { x: 0, y: 0, width: 0, height: 0 }
     }
+  }
+
+  // 根据指定变换矩阵计算元素的全局包围盒（不修改元素本身）
+  function getBoundsFromMatrix(el, matrix) {
+    try {
+      const bbox = el.getBBox()
+      const pts = [
+        new DOMPoint(bbox.x, bbox.y),
+        new DOMPoint(bbox.x + bbox.width, bbox.y),
+        new DOMPoint(bbox.x + bbox.width, bbox.y + bbox.height),
+        new DOMPoint(bbox.x, bbox.y + bbox.height)
+      ]
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+      pts.forEach(pt => {
+        const t = pt.matrixTransform(matrix)
+        if (t.x < minX) minX = t.x
+        if (t.y < minY) minY = t.y
+        if (t.x > maxX) maxX = t.x
+        if (t.y > maxY) maxY = t.y
+      })
+      return { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
+    } catch (e) {
+      return { x: 0, y: 0, width: 0, height: 0 }
+    }
+  }
+
+  // 判断全局包围盒是否完整位于绘制区域内（未配置绘制区域时恒为 true）
+  function boundsWithinArea(bounds) {
+    const area = getDrawingArea(svg)
+    if (!area) return true
+    const eps = 0.5
+    return (
+      bounds.x >= area.x - eps &&
+      bounds.y >= area.y - eps &&
+      bounds.x + bounds.width <= area.x + area.width + eps &&
+      bounds.y + bounds.height <= area.y + area.height + eps
+    )
+  }
+
+  // 绕 pivot 旋转 d 度后，一组元素（el + 初始矩阵）合并后的全局包围盒
+  function getGroupBoundsAfterRotate(pivotX, pivotY, d, elements) {
+    const rotationMatrix = svg.createSVGMatrix()
+      .translate(pivotX, pivotY)
+      .rotate(d)
+      .translate(-pivotX, -pivotY)
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    elements.forEach(({ el, initMatrix }) => {
+      const b = getBoundsFromMatrix(el, rotationMatrix.multiply(initMatrix))
+      minX = Math.min(minX, b.x)
+      minY = Math.min(minY, b.y)
+      maxX = Math.max(maxX, b.x + b.width)
+      maxY = Math.max(maxY, b.y + b.height)
+    })
+    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
+  }
+
+  // 把绕 pivot 的旋转量限制在绘制区域内：初始与目标之间二分查找最大可行旋转量，
+  // 图形到达限制角度后停止，只能反方向旋转（避免旋转+平移造成的抖动）
+  function clampRotationDelta(pivotX, pivotY, delta, elements) {
+    const area = getDrawingArea(svg)
+    if (!area) return delta
+    if (Math.abs(delta) < 0.01) return delta
+    const boundsFor = (d) => getGroupBoundsAfterRotate(pivotX, pivotY, d, elements)
+    // 初始位置已在区域外时不限制，避免图形被"冻结"无法旋转
+    if (!boundsWithinArea(boundsFor(0))) return delta
+    if (boundsWithinArea(boundsFor(delta))) return delta
+    let lo = 0
+    let hi = delta
+    for (let i = 0; i < 20; i++) {
+      const mid = (lo + hi) / 2
+      if (boundsWithinArea(boundsFor(mid))) lo = mid
+      else hi = mid
+    }
+    return lo
   }
 
   function getCursorForHandle(handleType, rotation) {
@@ -562,6 +649,17 @@ export function select(svg, onSelectionChangeCallback) {
       }
       setCursor(svg, target.style.cursor)
       captureState(pos)
+      if (dragMode === 'rotate') {
+        // 记录拖动开始时的鼠标角度，旋转期间用累计旋转角保持角度连续
+        const cx = selectedElements.length === 1
+          ? elementStates[0].startBounds.x + elementStates[0].startBounds.width / 2
+          : groupBounds.cx
+        const cy = selectedElements.length === 1
+          ? elementStates[0].startBounds.y + elementStates[0].startBounds.height / 2
+          : groupBounds.cy
+        lastRotRawAngle = (Math.atan2(pos.y - cy, pos.x - cx) * 180) / Math.PI + 90
+        accumRot = 0
+      }
       evt.stopPropagation()
       return
     }
@@ -684,17 +782,23 @@ export function select(svg, onSelectionChangeCallback) {
     } else if (dragMode === 'rotate') {
       if (selectedElements.length === 1) {
         const s = elementStates[0]
-        const cx = s.initCx !== undefined ? s.initCx : (s.bbox.x + s.bbox.width / 2)
-        const cy = s.initCy !== undefined ? s.initCy : (s.bbox.y + s.bbox.height / 2)
+        // 旋转中心取拖动开始时的全局包围盒中心：避免图形已缩放（sx/sy≠1）后
+        // transform 中的 cx/cy（缩放后中心）再乘 sx 导致旋转中心偏移
+        const visualCx = s.startBounds.x + s.startBounds.width / 2
+        const visualCy = s.startBounds.y + s.startBounds.height / 2
 
-        const visualCx = cx * s.initSx + s.initTx
-        const visualCy = cy * s.initSy + s.initTy
+        // 累计旋转角：鼠标角度增量归一化后累加，跨 atan2 ±180° 边界时仍保持连续
+        const rawAngle = (Math.atan2(pos.y - visualCy, pos.x - visualCx) * 180) / Math.PI + 90
+        if (lastRotRawAngle === null) lastRotRawAngle = rawAngle
+        accumRot += normalizeAngleDelta(rawAngle - lastRotRawAngle)
+        lastRotRawAngle = rawAngle
 
-        const angle = (Math.atan2(pos.y - visualCy, pos.x - visualCx) * 180) / Math.PI + 90
+        // 旋转角度硬限制在绘制区域内：到达限制角度后停止，只能反方向旋转
+        const clampedDelta = clampRotationDelta(visualCx, visualCy, accumRot, [{ el: s.el, initMatrix: s.initMatrix }])
 
         const rotationMatrix = svg.createSVGMatrix()
             .translate(visualCx, visualCy)
-            .rotate(angle - s.initRot)
+            .rotate(clampedDelta)
             .translate(-visualCx, -visualCy);
 
         const combinedMatrix = rotationMatrix.multiply(s.initMatrix);
@@ -713,11 +817,18 @@ export function select(svg, onSelectionChangeCallback) {
       } else {
         const cx = groupBounds.cx
         const cy = groupBounds.cy
-        const angle = (Math.atan2(pos.y - cy, pos.x - cx) * 180) / Math.PI + 90
+        // 累计旋转角：多选旋转同样保持角度连续
+        const rawAngle = (Math.atan2(pos.y - cy, pos.x - cx) * 180) / Math.PI + 90
+        if (lastRotRawAngle === null) lastRotRawAngle = rawAngle
+        accumRot += normalizeAngleDelta(rawAngle - lastRotRawAngle)
+        lastRotRawAngle = rawAngle
+        // 多选旋转同样硬限制在绘制区域内
+        const elements = selectedElements.map((el, i) => ({ el, initMatrix: elementStates[i].initMatrix }))
+        const clampedDelta = clampRotationDelta(cx, cy, accumRot, elements)
 
         const rotationMatrix = svg.createSVGMatrix()
             .translate(cx, cy)
-            .rotate(angle)
+            .rotate(clampedDelta)
             .translate(-cx, -cy);
 
         selectedElements.forEach((el, i) => {
@@ -727,7 +838,7 @@ export function select(svg, onSelectionChangeCallback) {
           const bboxCenterY = s.localBBox.y + s.localBBox.height / 2;
           el.setAttribute('transform', matrixToTransformString(combinedMatrix, bboxCenterX, bboxCenterY));
         })
-        transformGroup.setAttribute('transform', `rotate(${angle}, ${cx}, ${cy})`)
+        transformGroup.setAttribute('transform', `rotate(${clampedDelta}, ${cx}, ${cy})`)
       }
     } else if (dragMode === 'resize') {
       // 缩放时拖拽点不超出绘制区域
@@ -904,21 +1015,57 @@ export function select(svg, onSelectionChangeCallback) {
           const sx = s.bbox.width === 0 ? s.initSx : (newVisualW / s.bbox.width) * Math.sign(s.initSx)
           const sy = s.bbox.height === 0 ? s.initSy : (newVisualH / s.bbox.height) * Math.sign(s.initSy)
 
-          let newAnchorX_scaled = s.initX * sx
-          let newAnchorY_scaled = s.initY * sy
+          // 绘制区域限制：以锚点为固定点等比收缩，使缩放后的包围盒不超出绘制区域
+          let finalSx = sx
+          let finalSy = sy
+          if (getDrawingArea(svg)) {
+            const buildScaleMatrix = (k) => {
+              const fsx = sx * k
+              const fsy = sy * k
+              let anchorX = s.initX * fsx
+              let anchorY = s.initY * fsy
+              if (resizeHandle.includes('w')) anchorX = (s.initX + s.bbox.width) * fsx
+              if (resizeHandle.includes('n')) anchorY = (s.initY + s.bbox.height) * fsy
+              const vCx = (s.bbox.x + s.bbox.width / 2) * fsx
+              const vCy = (s.bbox.y + s.bbox.height / 2) * fsy
+              const rotatedAnchor = rotatePoint(anchorX, anchorY, vCx, vCy, s.initRot)
+              const tx = oldGlobalAnchor.x - rotatedAnchor.x
+              const ty = oldGlobalAnchor.y - rotatedAnchor.y
+              return svg.createSVGMatrix()
+                .translate(tx, ty)
+                .translate(vCx, vCy)
+                .rotate(s.initRot)
+                .translate(-vCx, -vCy)
+                .scaleNonUniform(fsx, fsy)
+            }
+            if (!boundsWithinArea(getBoundsFromMatrix(s.el, buildScaleMatrix(1)))) {
+              let lo = 0
+              let hi = 1
+              for (let i = 0; i < 20; i++) {
+                const mid = (lo + hi) / 2
+                if (boundsWithinArea(getBoundsFromMatrix(s.el, buildScaleMatrix(mid)))) lo = mid
+                else hi = mid
+              }
+              finalSx = sx * lo
+              finalSy = sy * lo
+            }
+          }
 
-          if (resizeHandle.includes('w')) newAnchorX_scaled = (s.initX + s.bbox.width) * sx
-          if (resizeHandle.includes('n')) newAnchorY_scaled = (s.initY + s.bbox.height) * sy
+          let newAnchorX_scaled = s.initX * finalSx
+          let newAnchorY_scaled = s.initY * finalSy
 
-          const newVisualCx = (s.bbox.x + s.bbox.width / 2) * sx
-          const newVisualCy = (s.bbox.y + s.bbox.height / 2) * sy
+          if (resizeHandle.includes('w')) newAnchorX_scaled = (s.initX + s.bbox.width) * finalSx
+          if (resizeHandle.includes('n')) newAnchorY_scaled = (s.initY + s.bbox.height) * finalSy
+
+          const newVisualCx = (s.bbox.x + s.bbox.width / 2) * finalSx
+          const newVisualCy = (s.bbox.y + s.bbox.height / 2) * finalSy
 
           const rotatedNewAnchor = rotatePoint(newAnchorX_scaled, newAnchorY_scaled, newVisualCx, newVisualCy, s.initRot)
 
           const newTx = oldGlobalAnchor.x - rotatedNewAnchor.x
           const newTy = oldGlobalAnchor.y - rotatedNewAnchor.y
 
-          const tStr = `translate(${newTx}, ${newTy}) rotate(${s.initRot}, ${newVisualCx}, ${newVisualCy}) scale(${sx}, ${sy})`
+          const tStr = `translate(${newTx}, ${newTy}) rotate(${s.initRot}, ${newVisualCx}, ${newVisualCy}) scale(${finalSx}, ${finalSy})`
 
           s.el.setAttribute('transform', tStr)
 
@@ -1173,6 +1320,9 @@ export function select(svg, onSelectionChangeCallback) {
 
     updateTransformHandles()
     dragMode = null
+    // 旋转拖动结束，重置累计旋转状态
+    lastRotRawAngle = null
+    accumRot = 0
   }
 
   const observer = new MutationObserver((mutations) => {
