@@ -178,13 +178,13 @@ const initCanvas = () => {
   //   'stroke-width': '1',
   //   uid:'777777'
   // })
-  BladeFire.createShape('path', {
-    d: 'M 200 200 L 240 240 L 11 240 L 44 120 L Z',
-    fill: '#00ff0080',
-    stroke: '#00ff0080',
-    'stroke-width': '1',
-    uid:'888888'
-  })
+  // BladeFire.createShape('path', {
+  //   d: 'M 200 200 L 240 240 L 11 240 L 44 120 L Z',
+  //   fill: '#00ff0080',
+  //   stroke: '#00ff0080',
+  //   'stroke-width': '1',
+  //   uid:'888888'
+  // })
 }
 
 const addPage = () => {
