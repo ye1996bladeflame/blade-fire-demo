@@ -1,4 +1,5 @@
 import { setCursor, history, createShape, getToolStyle, createListenerManager } from "../common/index.js";
+import { createPathEditor } from "../common/path-editor.js";
 import { clampPoint } from "../common/draw-area.js";
 
 let isDrawing = false;
@@ -6,6 +7,8 @@ let startX, startY;
 let currentTriangle = null;
 let svgElement = null;
 const listeners = createListenerManager();
+// 当前激活的通用路径编辑器实例（双击已有三角形进入编辑模式）
+let pathEditor = null;
 
 function getMousePosition(evt) {
     if (!svgElement) return { x: 0, y: 0 };
@@ -17,6 +20,8 @@ function getMousePosition(evt) {
 
 function onMouseDown(evt) {
     
+    if (pathEditor && pathEditor.guardMouseDown(evt)) return;
+
     if (evt.button !== 0) return;
 
     isDrawing = true;
@@ -79,7 +84,7 @@ function onMouseUp(evt) {
     }
 }
 
-export function triangle(svg) {
+export function triangle(svg, onSelectionChangeCallback) {
     console.log("Triangle tool activated");
     
     
@@ -92,6 +97,15 @@ export function triangle(svg) {
     
     setCursor(svgElement, "crosshair");
 
+    // 双击已有三角形 → 进入编辑模式（选中 + 顶点手柄，不影响左键绘制）
+    pathEditor = createPathEditor(svg, {
+        onSelectionChange: onSelectionChangeCallback,
+        onIsDrawing: () => isDrawing,
+        historyDesc: '调整三角形顶点',
+        historyShapeType: 'triangle',
+    });
+    pathEditor.attach();
+
     listeners.activate();
     listeners.on(svgElement, "mousedown", onMouseDown);
     listeners.on(svgElement, "mousemove", onMouseMove);
@@ -99,6 +113,10 @@ export function triangle(svg) {
 
     return () => {
         listeners.dispose();
+        if (pathEditor) {
+            pathEditor.dispose();
+            pathEditor = null;
+        }
         console.log("Deactivate triangle tool");
     };
 }

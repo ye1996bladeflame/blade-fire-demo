@@ -1,4 +1,5 @@
 import { setCursor, history, createShape, getToolStyle, createListenerManager } from "../common/index.js";
+import { createPathEditor } from "../common/path-editor.js";
 import { clampPoint } from "../common/draw-area.js";
 
 let isDrawing = false;
@@ -6,6 +7,8 @@ let startX, startY;
 let currentPathRect = null;
 let svgElement = null;
 const listeners = createListenerManager();
+// 当前激活的通用路径编辑器实例（双击已有路径矩形进入编辑模式）
+let pathEditor = null;
 
 function getMousePosition(evt) {
     if (!svgElement) return { x: 0, y: 0 };
@@ -24,6 +27,7 @@ function buildPathData(x, y, width, height) {
 }
 
 function onMouseDown(evt) {
+    if (pathEditor && pathEditor.guardMouseDown(evt)) return;
     if (evt.button !== 0) return;
 
     isDrawing = true;
@@ -77,7 +81,7 @@ function onMouseUp(evt) {
     }
 }
 
-export function pathRect(svg) {
+export function pathRect(svg, onSelectionChangeCallback) {
     console.log("Activate path-rect tool");
 
     svgElement = svg;
@@ -88,6 +92,15 @@ export function pathRect(svg) {
 
     setCursor(svgElement, "crosshair");
 
+    // 双击已有路径矩形 → 进入编辑模式（选中 + 顶点手柄，不影响左键绘制）
+    pathEditor = createPathEditor(svg, {
+        onSelectionChange: onSelectionChangeCallback,
+        onIsDrawing: () => isDrawing,
+        historyDesc: '调整路径矩形顶点',
+        historyShapeType: 'path-rect',
+    });
+    pathEditor.attach();
+
     listeners.activate();
     listeners.on(svgElement, "mousedown", onMouseDown);
     listeners.on(svgElement, "mousemove", onMouseMove);
@@ -95,6 +108,10 @@ export function pathRect(svg) {
 
     return () => {
         listeners.dispose();
+        if (pathEditor) {
+            pathEditor.dispose();
+            pathEditor = null;
+        }
         isDrawing = false;
         currentPathRect = null;
         console.log("Deactivate path-rect tool");

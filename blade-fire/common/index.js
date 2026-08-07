@@ -151,6 +151,7 @@ export { serializeElementForClipboard, pasteFromClipboard } from './clipboard.js
 export { createShape, SVG_NS, getToolStyle, setToolStyle, setGlobalStyle, generateUID } from './element.js';
 export { createListenerManager } from './listeners.js';
 export { parsePathData, buildPathData, isClosedPolygonPath } from './path-utils.js';
+export { createPathEditor } from './path-editor.js';
 
 let clipboard = null;
 export function setClipboard(data) {

@@ -177,7 +177,7 @@ class BladeFire {
         return circle(this.svg);
     }
     static pathEllipse() {
-        return pathEllipse(this.svg);
+        return pathEllipse(this.svg, (elements) => this.notifySelectionChange(elements));
     }
     static rect() {
         return rect(this.svg);
@@ -186,10 +186,10 @@ class BladeFire {
         return rotateRect(this.svg);
     }
     static "path-rect"() {
-        return pathRect(this.svg);
+        return pathRect(this.svg, (elements) => this.notifySelectionChange(elements));
     }
     static triangle() {
-        return triangle(this.svg);
+        return triangle(this.svg, (elements) => this.notifySelectionChange(elements));
     }
     static polygon() {
         return polygon(this.svg, (elements) => this.notifySelectionChange(elements));
@@ -198,7 +198,7 @@ class BladeFire {
         return text(this.svg);
     }
     static freehand() {
-        return freehand(this.svg, this.drawingLayer);
+        return freehand(this.svg, (elements) => this.notifySelectionChange(elements));
     }
     static erase() {
         return erase(this.svg);

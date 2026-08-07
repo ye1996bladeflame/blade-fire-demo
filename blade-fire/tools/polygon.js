@@ -1,4 +1,5 @@
-import { setCursor, history, undoRedoManager, createShape, getToolStyle, parseTransform, createListenerManager, parsePathData, buildPathData, isClosedPolygonPath } from "../common/index.js";
+import { setCursor, history, undoRedoManager, createShape, getToolStyle, createListenerManager, parsePathData, isClosedPolygonPath } from "../common/index.js";
+import { createPathEditor } from "../common/path-editor.js";
 import { clampPoint } from "../common/draw-area.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -43,114 +44,6 @@ export function polygon(svg, onSelectionChangeCallback) {
     let startPointMarker = null;
     let snapIndicator = null;
     let viewChangeObserver = null;
-
-    // Edit mode state — only one polygon at a time
-    let editingPath = null;
-    let editGroup = null;
-    let isDraggingVertex = false;
-    let dragVertexIndex = -1;
-    let dragInitPoints = [];
-    let dragInitTransform = "";
-
-    function getPathBounds(path) {
-        try {
-            const bbox = path.getBBox();
-            let matrix = svg.createSVGMatrix();
-            if (path.transform && path.transform.baseVal.numberOfItems > 0) {
-                for (let i = 0; i < path.transform.baseVal.numberOfItems; i++) {
-                    matrix = matrix.multiply(path.transform.baseVal.getItem(i).matrix);
-                }
-            }
-            const pts = [
-                new DOMPoint(bbox.x, bbox.y),
-                new DOMPoint(bbox.x + bbox.width, bbox.y),
-                new DOMPoint(bbox.x + bbox.width, bbox.y + bbox.height),
-                new DOMPoint(bbox.x, bbox.y + bbox.height),
-            ];
-            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-            pts.forEach((pt) => {
-                const t = pt.matrixTransform(matrix);
-                minX = Math.min(minX, t.x);
-                minY = Math.min(minY, t.y);
-                maxX = Math.max(maxX, t.x);
-                maxY = Math.max(maxY, t.y);
-            });
-            return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
-        } catch {
-            return { x: 0, y: 0, width: 0, height: 0 };
-        }
-    }
-
-    function notifySelection() {
-        if (!onSelectionChangeCallback) return;
-        if (!editingPath) {
-            onSelectionChangeCallback([]);
-            return;
-        }
-        const bounds = getPathBounds(editingPath);
-        const transform = editingPath.getAttribute("transform") || "";
-        onSelectionChangeCallback([{
-            id: editingPath.id,
-            tagName: editingPath.tagName,
-            x: bounds.x,
-            y: bounds.y,
-            width: bounds.width,
-            height: bounds.height,
-            rotation: parseTransform(transform).rotate || 0,
-        }]);
-    }
-
-    function exitEditMode() {
-        if (editGroup && editGroup.parentNode) {
-            editGroup.parentNode.removeChild(editGroup);
-        }
-        editGroup = null;
-        if (editingPath) {
-            editingPath.removeAttribute("data-polygon-editing");
-        }
-        editingPath = null;
-        isDraggingVertex = false;
-        dragVertexIndex = -1;
-        notifySelection();
-    }
-
-    function createEditHandles() {
-        if (editGroup && editGroup.parentNode) {
-            editGroup.parentNode.removeChild(editGroup);
-        }
-        editGroup = document.createElementNS(SVG_NS, "g");
-        editGroup.setAttribute("class", "polygon-edit-handles");
-        const transform = editingPath.getAttribute("transform");
-        if (transform) {
-            editGroup.setAttribute("transform", transform);
-        }
-        const vertexPoints = parsePathData(editingPath.getAttribute("d"));
-        const handleSize = 8;
-        vertexPoints.forEach((p, index) => {
-            const handle = createShape("circle", {
-                cx: p.x,
-                cy: p.y,
-                r: handleSize / 2,
-                fill: "white",
-                stroke: "#1890ff",
-                "stroke-width": 1,
-                cursor: "move",
-            });
-            handle.dataset.type = "vertex";
-            handle.dataset.index = String(index);
-            editGroup.appendChild(handle);
-        });
-        svg.appendChild(editGroup);
-    }
-
-    function enterEditMode(path) {
-        if (!path || !isClosedPolygonPath(path)) return;
-        exitEditMode();
-        editingPath = path;
-        editingPath.setAttribute("data-polygon-editing", "true");
-        createEditHandles();
-        notifySelection();
-    }
 
     function findSnapPoint(mousePos, snapRadius = 10) {
         const allPaths = Array.from(svg.querySelectorAll("path"));
@@ -256,79 +149,12 @@ export function polygon(svg, onSelectionChangeCallback) {
         resetState(false);
         history.commit("创建多边形", { shapeType: "polygon", relatedUids: [uid] });
 
-        enterEditMode(path);
-    }
-
-    function onEditMouseDown(evt) {
-        if (evt.button !== 0) return;
-        const target = evt.target;
-        if (!editGroup || !editGroup.contains(target) || target.dataset.type !== "vertex") {
-            return false;
-        }
-        isDraggingVertex = true;
-        dragVertexIndex = parseInt(target.dataset.index, 10);
-        dragInitPoints = parsePathData(editingPath.getAttribute("d"));
-        dragInitTransform = editingPath.getAttribute("transform") || "";
-        setCursor(svg, "move");
-        evt.stopPropagation();
-        evt.preventDefault();
-        return true;
-    }
-
-    let vertexDragStart = { x: 0, y: 0 };
-
-    function onVertexDragMove(evt) {
-        if (!isDraggingVertex || !editingPath) return;
-        const pos = getMousePos(evt);
-        const tData = parseTransform(dragInitTransform);
-        const dx = pos.x - vertexDragStart.x;
-        const dy = pos.y - vertexDragStart.y;
-
-        let ldx = dx;
-        let ldy = dy;
-        if (tData.rotate) {
-            const rad = (-tData.rotate * Math.PI) / 180;
-            ldx = dx * Math.cos(rad) - dy * Math.sin(rad);
-            ldy = dx * Math.sin(rad) + dy * Math.cos(rad);
-        }
-        ldx /= tData.sx || 1;
-        ldy /= tData.sy || 1;
-
-        const newPoints = dragInitPoints.map((p, i) => {
-            if (i === dragVertexIndex) {
-                return { x: p.x + ldx, y: p.y + ldy };
-            }
-            return p;
-        });
-
-        editingPath.setAttribute("d", buildPathData(newPoints));
-        const handle = editGroup.querySelector(`[data-index="${dragVertexIndex}"]`);
-        if (handle) {
-            handle.setAttribute("cx", newPoints[dragVertexIndex].x);
-            handle.setAttribute("cy", newPoints[dragVertexIndex].y);
-        }
-        notifySelection();
-    }
-
-    function onVertexDragUp() {
-        if (!isDraggingVertex || !editingPath) return;
-
-        const newD = editingPath.getAttribute("d");
-        const oldD = buildPathData(dragInitPoints);
-        if (newD !== oldD) {
-            history.commit("调整多边形顶点", { shapeType: "polygon", relatedUids: [editingPath.getAttribute("uid")] });
-        }
-
-        isDraggingVertex = false;
-        dragVertexIndex = -1;
-        setCursor(svg, "crosshair");
+        editor.enterEditMode(path);
     }
 
     function onMouseDown(evt) {
-        if (onEditMouseDown(evt)) {
-            vertexDragStart = getMousePos(evt);
-            return;
-        }
+        // 顶点手柄拖拽 / 双击第二击由通用编辑器消费
+        if (editor.guardMouseDown(evt)) return;
 
         if (evt.button === 2) {
             if (points.length >= 3) {
@@ -342,11 +168,6 @@ export function polygon(svg, onSelectionChangeCallback) {
         }
 
         if (evt.button !== 0) return;
-
-        // Double-click second mousedown should not add a point or start new draw
-        if (evt.detail >= 2) {
-            return;
-        }
 
         let pos = getMousePos(evt);
 
@@ -366,11 +187,7 @@ export function polygon(svg, onSelectionChangeCallback) {
             }
         }
 
-        // Starting a new polygon — clear previous edit mode
-        if (points.length === 0) {
-            exitEditMode();
-        }
-
+        // 左键绘制开始即退出编辑模式，由通用编辑器 attach 的 mousedown 监听处理
         const externalSnapPoint = findSnapPoint(pos);
         if (externalSnapPoint) {
             pos = externalSnapPoint;
@@ -432,11 +249,6 @@ export function polygon(svg, onSelectionChangeCallback) {
     }
 
     function onMouseMove(evt) {
-        if (isDraggingVertex) {
-            onVertexDragMove(evt);
-            return;
-        }
-
         if (!activePath) return;
 
         let pos = getMousePos(evt);
@@ -487,16 +299,9 @@ export function polygon(svg, onSelectionChangeCallback) {
     }
 
     function onDblClick(evt) {
+        // 双击正在绘制的多边形 → 闭合；双击已有闭合路径 → 由通用编辑器的 dblclick 监听进入编辑模式
         if (activePath && points.length >= 3) {
             closePolygon();
-            evt.stopPropagation();
-            evt.preventDefault();
-            return;
-        }
-
-        const target = evt.target;
-        if (isClosedPolygonPath(target) && target !== activePath) {
-            enterEditMode(target);
             evt.stopPropagation();
             evt.preventDefault();
         }
@@ -512,7 +317,7 @@ export function polygon(svg, onSelectionChangeCallback) {
 
     function switchToDrawMode(vertexPoints, path) {
         // 从编辑模式切换回绘制模式，使用已有的 path 和顶点
-        exitEditMode();
+        editor.exitEditMode();
         const newD = vertexPoints.map((p, i) => (i === 0 ? "M" : "L") + ` ${p.x} ${p.y}`).join(" ");
         path.setAttribute("d", newD);
         path.setAttribute("fill", "none");
@@ -547,25 +352,21 @@ export function polygon(svg, onSelectionChangeCallback) {
     // ---- undo/redo 闭包处理器（仅用于 onRestore 时创建编辑手柄） ----
 
     _onPolygonRestore = (cmd, svg) => {
-        if (editingPath) {
-            const uid = editingPath.getAttribute("uid");
+        const editingEl = editor.getEditingPath();
+        if (editingEl) {
+            const uid = editingEl.getAttribute("uid");
             const el = svg.querySelector(`[uid="${uid}"]`);
             if (el && isClosedPolygonPath(el)) {
-                editingPath = el;
-                editingPath.setAttribute("data-polygon-editing", "true");
-                createEditHandles();
-                notifySelection();
+                editor.enterEditMode(el);
             } else {
-                exitEditMode();
+                editor.exitEditMode();
             }
             return;
         }
         if (!activePath && !points.length) {
             const el = svg.querySelector('[data-polygon-editing="true"]');
             if (el && isClosedPolygonPath(el)) {
-                editingPath = el;
-                createEditHandles();
-                notifySelection();
+                editor.enterEditMode(el);
             }
         }
     };
@@ -592,7 +393,7 @@ export function polygon(svg, onSelectionChangeCallback) {
                     const path = svg.querySelector(`[uid="${uid}"]`);
                     if (path && isClosedPolygonPath(path)) {
                         if (activePath) resetState(false);
-                        enterEditMode(path);
+                        editor.enterEditMode(path);
                     }
                 } else if (activePath && activePath.getAttribute("uid") === uid) {
                     // 在绘制模式中且是同一多边形 → 同步本地状态和引导线
@@ -609,7 +410,7 @@ export function polygon(svg, onSelectionChangeCallback) {
                     // 不在绘制模式或不是同一多边形 → 切换到该多边形的绘制模式
                     const path = svg.querySelector(`[uid="${uid}"]`);
                     if (path) {
-                        exitEditMode();
+                        editor.exitEditMode();
                         if (activePath) resetState(true);
                         switchToDrawMode(newPoints, path);
                     }

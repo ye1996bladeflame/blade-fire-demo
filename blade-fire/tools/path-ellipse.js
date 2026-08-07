@@ -1,4 +1,5 @@
 import { setCursor, history, createShape, getToolStyle, createListenerManager } from "../common/index.js";
+import { createPathEditor } from "../common/path-editor.js";
 import { clampPoint } from "../common/draw-area.js";
 
 let isDrawing = false;
@@ -6,6 +7,8 @@ let startX, startY;
 let currentEllipse = null;
 let svgElement = null;
 const listeners = createListenerManager();
+// 当前激活的通用路径编辑器实例（双击已有路径椭圆进入编辑模式）
+let pathEditor = null;
 
 function getMousePosition(evt) {
     if (!svgElement) return { x: 0, y: 0 };
@@ -37,6 +40,7 @@ function buildEllipsePath(cx, cy, rx, ry) {
 }
 
 function onMouseDown(evt) {
+    if (pathEditor && pathEditor.guardMouseDown(evt)) return;
     if (evt.button !== 0) return;
 
     isDrawing = true;
@@ -99,7 +103,7 @@ function onMouseUp(evt) {
     }
 }
 
-export function pathEllipse(svg) {
+export function pathEllipse(svg, onSelectionChangeCallback) {
     console.log("Activate path ellipse tool");
 
     svgElement = svg;
@@ -110,6 +114,15 @@ export function pathEllipse(svg) {
 
     setCursor(svgElement, "crosshair");
 
+    // 双击已有路径椭圆 → 进入编辑模式（选中 + 顶点手柄，不影响左键绘制）
+    pathEditor = createPathEditor(svg, {
+        onSelectionChange: onSelectionChangeCallback,
+        onIsDrawing: () => isDrawing,
+        historyDesc: '调整椭圆顶点',
+        historyShapeType: 'pathEllipse',
+    });
+    pathEditor.attach();
+
     listeners.activate();
     listeners.on(svgElement, "mousedown", onMouseDown);
     listeners.on(svgElement, "mousemove", onMouseMove);
@@ -117,6 +130,10 @@ export function pathEllipse(svg) {
 
     return () => {
         listeners.dispose();
+        if (pathEditor) {
+            pathEditor.dispose();
+            pathEditor = null;
+        }
         console.log("Deactivate path ellipse tool");
     };
 }

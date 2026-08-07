@@ -1,4 +1,5 @@
 import { setCursor, history, createShape, createListenerManager } from "../common/index.js";
+import { createPathEditor } from "../common/path-editor.js";
 import { getDrawingArea, clampPoint } from "../common/draw-area.js";
 
 /**
@@ -39,6 +40,15 @@ export function ocr(svg, onSelectionChangeCallback) {
     let dragCleanup = null;   // 拖拽期间 window 监听器的清理函数
 
     const listeners = createListenerManager();
+
+    // 双击已有 OCR 不规则图形 → 进入编辑模式（选中 + 顶点手柄，不影响左键绘制）
+    const editor = createPathEditor(svg, {
+        onSelectionChange: onSelectionChangeCallback,
+        onIsDrawing: () => !!(activePath || confirmed || ocrPath),
+        historyDesc: '调整OCR图形顶点',
+        historyShapeType: 'ocr',
+    });
+    editor.attach();
 
     function getMousePos(evt) {
         const CTM = svg.getScreenCTM();
@@ -323,6 +333,8 @@ export function ocr(svg, onSelectionChangeCallback) {
     // ---- 阶段一：逐点绘制 ----
 
     function onMouseDown(evt) {
+        if (editor.guardMouseDown(evt)) return;
+
         if (evt.button === 2) {
             // 右键确认：至少 2 个点才能进入拖拽拉出模式
             if (!confirmed && activePath && countPoints(activePath.getAttribute("d")) >= 2) {
@@ -425,6 +437,7 @@ export function ocr(svg, onSelectionChangeCallback) {
         listeners.dispose();
         if (dragCleanup) dragCleanup();
         dragCleanup = null;
+        editor.dispose();
         resetState();
         setCursor(svg, "default");
         console.log("Deactivate OCR tool");
